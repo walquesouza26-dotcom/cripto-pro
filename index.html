@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111110">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Cripto Pro">
+<title>Cripto Pro — Sinais com histórico testado</title>
+<style>
+:root{
+  --bg:#111110; --s1:#1a1a19; --s2:#232322; --line:#33332f;
+  --tx:#f0efec; --tx2:#c3c2b7; --mut:#96958a;
+  --c1:#3987e5; --c2:#d95926; --c3:#199e70;
+  --up:#3dbb5e; --dn:#e66767; --good:#0ca30c; --crit:#d03b3b; --warn:#fab219; --neutral:#383835;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1240px;margin:0 auto;padding:14px}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}
+h1{font-size:19px;margin:0}
+h1 small{font-weight:400;color:var(--mut);font-size:12px;display:block}
+h2{font-size:15px;margin:0 0 10px}
+h3{font-size:13px;margin:0 0 6px;color:var(--tx2);font-weight:600}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.status{font-size:12px;color:var(--mut);display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:#666}
+.dot.live{background:var(--up)} .dot.poll{background:var(--warn)}
+select,input,button{font:inherit;color:var(--tx);background:var(--s2);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+button{cursor:pointer} button.pri{background:var(--c1);border-color:var(--c1);color:#fff;font-weight:600}
+button.dan{background:transparent;border-color:var(--crit);color:var(--dn)}
+nav{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);margin-bottom:12px}
+nav button{border:0;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--mut);padding:9px 13px;white-space:nowrap}
+nav button.on{color:var(--tx);border-bottom-color:var(--c1);font-weight:600}
+.tab{display:none} .tab.on{display:block}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px}
+.kpi{background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+.kpi .k{font-size:12px;color:var(--mut)} .kpi .v{font-size:20px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums} .kpi .s{font-size:12px;color:var(--tx2)}
+.panel{background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:13px;margin-bottom:12px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px} @media(max-width:900px){.g2{grid-template-columns:1fr}}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{padding:8px 7px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th{font-size:12px;color:var(--mut);font-weight:500}
+th:first-child,td:first-child{text-align:left}
+tr.click{cursor:pointer} tr.click:hover{background:var(--s2)}
+.up{color:var(--up)} .dn{color:var(--dn)} .mut{color:var(--mut)} .note{font-size:12px;color:var(--mut)}
+.sig{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;letter-spacing:.3px}
+.sig.BUY{background:#0f3d19;color:#6fe08a} .sig.HOLD{background:#12314f;color:#8fc1ff}
+.sig.SELL{background:#4a1616;color:#ff9a9a} .sig.WAIT{background:var(--neutral);color:var(--tx2)} .sig.WEAK{background:#40300a;color:#ffd166}
+.val{font-size:11px;padding:2px 6px;border-radius:5px;border:1px solid var(--line);color:var(--tx2)}
+.val.ok{border-color:#1f6b33;color:#6fe08a} .val.no{border-color:#6b5a1f;color:#ffd166}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:10px}
+.chip{background:var(--s2);border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:12px;cursor:pointer;white-space:nowrap;color:var(--tx2)}
+.chip.on{background:var(--c1);border-color:var(--c1);color:#fff;font-weight:600}
+.hero{display:flex;flex-wrap:wrap;gap:14px;justify-content:space-between;align-items:flex-start}
+.hero .p{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums}
+.reasons{margin:8px 0 0;padding:0;list-style:none} .reasons li{padding:3px 0;font-size:13px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:8px}
+.card{background:var(--s2);border:1px solid var(--line);border-radius:10px;padding:10px}
+.card .k{font-size:12px;color:var(--mut)} .card .v{font-size:15px;font-weight:600;margin-top:2px} .card .s{font-size:12px;color:var(--tx2);margin-top:2px}
+.chart{position:relative;width:100%} .chart svg{display:block;width:100%}
+.tip{position:absolute;pointer-events:none;background:#000d;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:12px;white-space:nowrap;display:none;z-index:5}
+.tip i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--tx2);margin-bottom:4px}
+.legend i{display:inline-block;width:12px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
+.hb{display:grid;grid-template-columns:54px 1fr 64px;gap:8px;align-items:center;font-size:12px;padding:2px 0}
+.hb .t{position:relative;height:14px;background:transparent}
+.hb .t:before{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--line)}
+.hb .t.ns:before{display:none}
+.hb .t i{position:absolute;top:0;height:100%;border-radius:4px}
+.hb .n{text-align:right;font-variant-numeric:tabular-nums}
+.heat td,.heat th{text-align:center;padding:5px 4px;font-size:11px;border:2px solid var(--s1)}
+.warnbox{background:#2b2210;border:1px solid #5d4a16;color:#ffe2a6;border-radius:12px;padding:11px 13px;font-size:13px;margin-bottom:12px}
+#prog{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-bottom:10px} #prog i{display:block;height:100%;width:0;background:var(--c1);transition:width .2s}
+.opp{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
+.flash{animation:fl .6s} @keyframes fl{from{background:#3987e544}to{background:transparent}}
+ol.guide{padding-left:18px;margin:0} ol.guide li{margin-bottom:8px}
+.g2>*,.panel{min-width:0}
+#sigCards{display:none}
+.scard{background:var(--s2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
+.scard .r1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.scard .r2{display:flex;justify-content:space-between;margin-top:6px;font-variant-numeric:tabular-nums}
+.scard .r2 b{font-size:16px}
+.scard .r3{font-size:12px;color:var(--tx2);margin-top:5px}
+textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(--tx);background:var(--s2);border:1px solid var(--line);border-radius:8px;padding:8px}
+#inst{display:none}
+@media(max-width:640px){
+  body{padding-bottom:calc(66px + env(safe-area-inset-bottom))}
+  .wrap{padding:10px;padding-top:calc(10px + env(safe-area-inset-top))}
+  header{margin-bottom:8px} h1{font-size:17px} h1 small{display:none}
+  header select{padding:6px 6px;max-width:132px}
+  nav{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--s1);border-top:1px solid var(--line);border-bottom:0;margin:0;gap:0;padding-bottom:env(safe-area-inset-bottom);overflow:visible}
+  nav button{flex:1;min-height:56px;padding:6px 2px;font-size:11px;border-bottom:0;border-top:2px solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+  nav button.on{border-bottom:0;border-top-color:var(--c1)}
+  nav button:before{content:attr(data-i);font-size:19px;line-height:1}
+  .kpis{grid-template-columns:1fr 1fr} .kpi{padding:9px 11px} .kpi .v{font-size:17px}
+  .panel{padding:11px;border-radius:10px}
+  #sigTable{display:none} #sigCards{display:block}
+  .opp,.cards{grid-template-columns:1fr 1fr} .opp{grid-template-columns:1fr}
+  select,input,button{min-height:42px}
+  .hero .p{font-size:24px}
+  th,td{padding:8px 6px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Cripto Pro <small>Sinais de compra e venda testados no histórico de cada moeda</small></h1>
+  <div class="row">
+    <span class="status"><span class="dot" id="dot"></span><span id="st">Iniciando…</span></span>
+    <select id="tf" title="Período de cada vela"><option value="1d">Diário (mais confiável)</option><option value="4h">4 horas (mais sinais)</option></select>
+    <select id="cur"><option>BRL</option><option>USD</option></select>
+    <button id="reload" title="Reanalisar agora">↻</button><button id="inst" class="pri">Instalar</button>
+  </div>
+</header>
+<div id="prog"><i></i></div>
+<nav id="nav">
+  <button data-t="painel" data-i="📊" class="on">Painel</button><button data-t="moeda" data-i="🪙">Moeda</button>
+  <button data-t="carteira" data-i="💼">Carteira</button><button data-t="base" data-i="🧠">Base</button><button data-t="guia" data-i="📘">Guia</button>
+</nav>
+
+<section class="tab on" id="t-painel">
+  <div class="kpis" id="kpis"></div>
+  <div class="panel"><h2>Oportunidades agora</h2><div class="opp" id="opp"><span class="note">Analisando histórico…</span></div></div>
+  <div class="panel">
+    <h2>Sinais por moeda</h2>
+    <div id="sigCards"></div><div class="tw" id="sigTable"><table><thead><tr><th>Moeda</th><th>Sinal</th><th>Preço</th><th>24h</th><th>7d</th><th>30d</th><th>Regra escolhida</th><th>Teste cego</th><th>Acerto</th><th>Média/semana</th><th>vs. só segurar</th></tr></thead><tbody id="sigBody"></tbody></table></div>
+    <p class="note"><b>Teste cego:</b> a regra é escolhida usando só os primeiros 70% do histórico e depois medida nos 30% finais, que ela nunca “viu” — já com taxa de 0,1% por operação. “Validado” = deu lucro nesse trecho. Toque numa moeda para ver os detalhes.</p>
+  </div>
+  <div class="g2">
+    <div class="panel"><h2>Variação em 30 dias</h2><div id="bar30"></div></div>
+    <div class="panel"><h2>Oscilação típica por semana</h2><div id="barVol"></div><p class="note">Quanto o preço costuma variar, para cima ou para baixo, em 7 dias.</p></div>
+  </div>
+</section>
+
+<section class="tab" id="t-moeda">
+  <div class="chips" id="chips"></div>
+  <div class="panel"><div class="hero" id="hero"></div></div>
+  <div class="panel"><h2>Como esta moeda se comporta</h2><div class="cards" id="prof"></div><p class="note" id="profTxt" style="margin-top:10px"></p></div>
+  <div class="panel"><h2>Preço, médias e operações da regra</h2>
+    <div class="legend"><span><i style="background:var(--c1)"></i>Preço</span><span><i style="background:var(--c2)"></i>Média 50</span><span><i style="background:var(--c3)"></i>Média 200</span><span>▲ compra</span><span>▼ venda</span></div>
+    <div class="chart" id="chPrice"></div></div>
+  <div class="g2">
+    <div class="panel"><h2>Resultado: regra × só segurar</h2>
+      <div class="legend"><span><i style="background:var(--c1)"></i>Seguindo a regra</span><span><i style="background:var(--c2)"></i>Comprar e segurar</span></div>
+      <div class="chart" id="chEq"></div><p class="note">Base 100 no início. A linha vertical marca onde começa o teste cego.</p></div>
+    <div class="panel"><h2>Força do movimento (RSI 14)</h2><div class="chart" id="chRsi"></div><p class="note">Abaixo de 30: muito vendida. Acima de 70: muito comprada.</p></div>
+  </div>
+  <div class="g2">
+    <div class="panel"><h2>Retorno médio por dia da semana</h2><div id="barDow"></div><p class="note">Média histórica diária (horário UTC). Padrão fraco: use só como contexto.</p></div>
+    <div class="panel"><h2>Todas as regras testadas nesta moeda</h2><div class="tw"><table><thead><tr><th>Regra</th><th>Treino (70%)</th><th>Teste cego (30%)</th><th>Operações</th><th>Acerto</th><th>Pior queda</th></tr></thead><tbody id="stratBody"></tbody></table></div></div>
+  </div>
+</section>
+
+<section class="tab" id="t-carteira">
+  <div class="warnbox">Carteira de treino: nenhum dinheiro real é movimentado. Use por algumas semanas para ver se seguir os sinais dá resultado <b>antes</b> de operar de verdade numa corretora.</div>
+  <div class="kpis" id="pfK"></div>
+  <div class="panel"><h2>Posições abertas</h2><div class="tw"><table><thead><tr><th>Moeda</th><th>Compra</th><th>Preço atual</th><th>Valor</th><th>Resultado</th><th>Sinal</th><th></th></tr></thead><tbody id="pfPos"></tbody></table></div></div>
+  <div class="g2">
+    <div class="panel"><h2>Resultado realizado por semana</h2><div id="pfWeeks"></div></div>
+    <div class="panel"><h2>Operações encerradas</h2><div class="tw"><table><thead><tr><th>Moeda</th><th>Entrada</th><th>Saída</th><th>Resultado</th></tr></thead><tbody id="pfClosed"></tbody></table></div></div>
+  </div>
+  <div class="panel"><h2>Usar em outro celular ou computador</h2>
+    <p class="note">O histórico das moedas, os perfis e os sinais são recalculados sozinhos em qualquer aparelho. Só a sua carteira simulada precisa ser levada: gere o código aqui e restaure no outro aparelho.</p>
+    <textarea id="syncTxt" placeholder="Cole aqui o código gerado no outro aparelho"></textarea>
+    <div class="row" style="margin-top:8px"><button class="pri" id="mkCode">Gerar código</button><button id="useCode">Restaurar</button><button id="expFile">Salvar arquivo</button><label class="note">Abrir arquivo <input type="file" id="impFile" accept=".json,application/json" style="max-width:180px"></label></div>
+    <p class="note" id="syncMsg"></p></div>
+  <div class="row"><input id="pfStart" type="number" value="1000" min="10" style="width:120px"><button class="dan" id="pfReset">Reiniciar carteira com este valor</button></div>
+</section>
+
+<section class="tab" id="t-base">
+  <div class="panel"><h2>Perfil de comportamento de cada moeda</h2>
+    <div class="tw"><table><thead><tr><th>Moeda</th><th>Tendência</th><th>Oscilação/sem.</th><th>Pior queda</th><th>Queda atual</th><th>Segue o BTC</th><th>Após queda forte (3d)</th><th>Após alta forte (3d)</th><th>Melhor dia</th><th>Padrão</th></tr></thead><tbody id="baseBody"></tbody></table></div>
+    <p class="note">Calculado sobre até 1.000 dias de histórico, refeito em cada aparelho e guardado para uso sem internet. Atualizado em: <span id="baseTs">—</span></p></div>
+  <div class="panel"><h2>Quem anda junto (correlação de 90 dias)</h2><div class="tw"><table class="heat" id="heat"></table></div><p class="note">+1 = sobem e caem juntas; 0 = independentes. Moedas muito correlacionadas não diversificam o risco.</p></div>
+  <div class="panel"><h2>Histórico de sinais</h2><p class="note">Reconstruído a partir do histórico de preços a cada abertura — aparece igual em qualquer celular ou computador, sem precisar copiar nada.</p>
+    <div class="tw"><table><thead><tr><th>Data</th><th>Moeda</th><th>Sinal</th><th>Preço no sinal</th><th>Desde então</th><th>Regra</th></tr></thead><tbody id="logBody"></tbody></table></div>
+    </div>
+</section>
+
+<section class="tab" id="t-guia">
+  <div class="panel"><h2>Como a plataforma decide</h2>
+    <ol class="guide">
+      <li><b>Baixa o histórico</b> de cada moeda na Binance (até 1.000 velas) e guarda na base local.</li>
+      <li><b>Mede o comportamento</b>: tendência, oscilação, quedas, reação após quedas e altas fortes, dias da semana, ligação com o Bitcoin.</li>
+      <li><b>Testa 5 regras clássicas</b> em cada moeda (tendência, rompimento, reversão por RSI, recuo em tendência de alta, bandas de Bollinger), descontando 0,1% de taxa por operação.</li>
+      <li><b>Escolhe a regra que melhor funcionou</b> nos primeiros 70% do histórico e confere nos 30% finais. Só vira sinal de <span class="sig BUY">COMPRAR</span> se também deu lucro no teste cego.</li>
+      <li><b>Sinais</b>: <span class="sig BUY">COMPRAR</span> entrada recente · <span class="sig HOLD">MANTER</span> regra segue comprada · <span class="sig SELL">VENDER</span> saída recente · <span class="sig WAIT">AGUARDAR</span> fora, sem gatilho · <span class="sig WEAK">SINAL FRACO</span> gatilho acionou, mas a regra não passou no teste cego.</li>
+    </ol></div>
+  <div class="panel"><h2>Para buscar resultados pequenos e constantes</h2>
+    <ol class="guide">
+      <li>Divida o valor em 4 a 6 partes iguais; nunca coloque tudo numa moeda.</li>
+      <li>Entre só em sinais <b>validados</b> e saia quando aparecer <b>VENDER</b> — a saída é o que protege o resultado.</li>
+      <li>Em valores pequenos, taxas pesam: evite operar com menos de ~R$ 50 por ordem e prefira o período diário.</li>
+      <li>Acompanhe a coluna “Média/semana”: ela mostra a ordem de grandeza realista (frações de 1% por semana, com semanas negativas no meio).</li>
+      <li>Treine na Carteira simulada por algumas semanas antes de usar dinheiro real.</li>
+    </ol></div>
+  <div class="warnbox">⚠️ Resultado passado não garante resultado futuro. Os sinais são estatísticos: várias operações dão prejuízo mesmo em regras lucrativas. Isto é uma ferramenta de apoio, não recomendação de investimento. Use apenas dinheiro que você pode perder.</div>
+</section>
+<p class="note" style="text-align:center;padding:10px 0 30px">Dados: Binance (histórico e preços ao vivo) · Alternative.me (Medo &amp; Ganância). Base salva localmente neste navegador.</p>
+</div>
+
+<script>
+//<core>
+const COINS=[['BTC','Bitcoin'],['ETH','Ethereum'],['XRP','XRP'],['BNB','BNB'],['SOL','Solana'],['TRX','TRON'],['DOGE','Dogecoin'],['ADA','Cardano'],['LINK','Chainlink'],['LTC','Litecoin'],['AVAX','Avalanche'],['SUI','Sui'],['DOT','Polkadot'],['ZEC','Zcash'],['SHIB','Shiba Inu']].map(([sym,name])=>({sym,name,pair:sym+'USDT'}));
+const FEE=0.001, WARM=200, SPLIT=0.7;
+const mean=a=>a.reduce((x,y)=>x+y,0)/(a.length||1);
+const sd=a=>{if(a.length<2)return 0;const m=mean(a);return Math.sqrt(a.reduce((s,v)=>s+(v-m)**2,0)/(a.length-1));};
+function sma(a,n){const o=Array(a.length).fill(null);let s=0;for(let i=0;i<a.length;i++){s+=a[i];if(i>=n)s-=a[i-n];if(i>=n-1)o[i]=s/n;}return o;}
+function rollSd(a,n){const o=Array(a.length).fill(null);for(let i=n-1;i<a.length;i++)o[i]=sd(a.slice(i-n+1,i+1));return o;}
+function rsi(c,n=14){const o=Array(c.length).fill(null);let g=0,l=0;for(let i=1;i<c.length;i++){const d=c[i]-c[i-1],u=Math.max(d,0),w=Math.max(-d,0);
+  if(i<=n){g+=u;l+=w;if(i===n){g/=n;l/=n;o[i]=100-100/(1+g/(l||1e-12));}}else{g=(g*(n-1)+u)/n;l=(l*(n-1)+w)/n;o[i]=100-100/(1+g/(l||1e-12));}}return o;}
+function rollExt(a,n,fn){const o=Array(a.length).fill(null);for(let i=n;i<a.length;i++){let m=a[i-n];for(let j=i-n+1;j<i;j++)m=fn(m,a[j]);o[i]=m;}return o;} // exclui a vela atual
+function indicators(d){const c=d.c;return{s20:sma(c,20),s50:sma(c,50),s100:sma(c,100),s200:sma(c,200),sd20:rollSd(c,20),rsi:rsi(c),hi20:rollExt(d.h,20,Math.max),lo10:rollExt(d.l,10,Math.min)};}
+function runRule(n,enter,exit){const pos=Array(n).fill(0);let p=0,held=0;for(let i=WARM;i<n;i++){if(!p){if(enter(i)){p=1;held=0;}}else{held++;if(exit(i,held))p=0;}pos[i]=p;}return pos;}
+const STRATS=[
+ {key:'trend',name:'Seguir tendência',buy:'Preço acima da média de 50 e média de 20 acima da de 50',sell:'Preço fecha abaixo da média de 50',
+  run:(d,I)=>runRule(d.c.length,i=>d.c[i]>I.s50[i]&&I.s20[i]>I.s50[i],i=>d.c[i]<I.s50[i]),
+  why:(d,I,i,f)=>[[d.c[i]>I.s50[i],`Preço ${d.c[i]>I.s50[i]?'acima':'abaixo'} da média de 50 (${f(I.s50[i])})`],[I.s20[i]>I.s50[i],`Média de 20 ${I.s20[i]>I.s50[i]?'acima':'abaixo'} da média de 50`]]},
+ {key:'breakout',name:'Rompimento',buy:'Preço fecha acima da máxima dos últimos 20 períodos',sell:'Preço fecha abaixo da mínima dos últimos 10 períodos',
+  run:(d,I)=>runRule(d.c.length,i=>d.c[i]>I.hi20[i],i=>d.c[i]<I.lo10[i]),
+  why:(d,I,i,f)=>[[d.c[i]>I.hi20[i],`Máxima de 20 períodos em ${f(I.hi20[i])} (gatilho de compra)`],[d.c[i]>=I.lo10[i],`Mínima de 10 períodos em ${f(I.lo10[i])} (gatilho de venda)`]]},
+ {key:'rsi',name:'Reversão (RSI)',buy:'RSI abaixo de 30 (moeda muito vendida)',sell:'RSI acima de 55 ou após 10 períodos',
+  run:(d,I)=>runRule(d.c.length,i=>I.rsi[i]<30,(i,h)=>I.rsi[i]>55||h>=10),
+  why:(d,I,i)=>[[I.rsi[i]<30,`RSI em ${I.rsi[i].toFixed(0)} (compra abaixo de 30, venda acima de 55)`]]},
+ {key:'dip',name:'Recuo em alta',buy:'RSI abaixo de 40 com preço acima da média de 100',sell:'RSI acima de 65 ou preço 5% abaixo da média de 100',
+  run:(d,I)=>runRule(d.c.length,i=>I.rsi[i]<40&&d.c[i]>I.s100[i],i=>I.rsi[i]>65||d.c[i]<I.s100[i]*0.95),
+  why:(d,I,i,f)=>[[d.c[i]>I.s100[i],`Preço ${d.c[i]>I.s100[i]?'acima':'abaixo'} da média de 100 (${f(I.s100[i])})`],[I.rsi[i]<40,`RSI em ${I.rsi[i].toFixed(0)} (compra abaixo de 40)`]]},
+ {key:'boll',name:'Bollinger em alta',buy:'Preço abaixo da banda inferior, mas acima da média de 200',sell:'Preço volta à média de 20 ou cai 7% abaixo da média de 200',
+  run:(d,I)=>runRule(d.c.length,i=>d.c[i]<I.s20[i]-2*I.sd20[i]&&d.c[i]>I.s200[i],i=>d.c[i]>=I.s20[i]||d.c[i]<I.s200[i]*0.93),
+  why:(d,I,i,f)=>[[d.c[i]>I.s200[i],`Preço ${d.c[i]>I.s200[i]?'acima':'abaixo'} da média de 200 (${f(I.s200[i])})`],[d.c[i]<I.s20[i]-2*I.sd20[i],`Banda inferior em ${f(I.s20[i]-2*I.sd20[i])} (gatilho de compra)`]]},
+];
+function backtest(c,pos,from,to){let eq=1,peak=1,dd=0,entry=-1;const curve=[],trades=[];
+  if(pos[from]){eq*=1-FEE;entry=from;} curve.push(eq);
+  for(let i=from+1;i<=to;i++){if(pos[i-1])eq*=c[i]/c[i-1];
+    if(pos[i]!==pos[i-1]){eq*=1-FEE;if(pos[i])entry=i;else{trades.push({i0:entry,i1:i,r:c[i]/c[entry]*(1-FEE)**2-1});entry=-1;}}
+    peak=Math.max(peak,eq);dd=Math.max(dd,1-eq/peak);curve.push(eq);}
+  if(entry>=0)trades.push({i0:entry,i1:to,r:c[to]/c[entry]*(1-FEE)-1,open:true});
+  const wins=trades.filter(t=>t.r>0).length;
+  return{ret:eq-1,bh:c[to]/c[from]-1,dd,trades,n:trades.length,win:trades.length?wins/trades.length:null,curve};}
+function analyze(d,barsPerDay,recent){const n=d.c.length;if(n<WARM+100)return null;
+  const I=indicators(d),split=Math.floor(WARM+(n-1-WARM)*SPLIT);
+  const res=STRATS.map(s=>{const pos=s.run(d,I),is=backtest(d.c,pos,WARM,split),oos=backtest(d.c,pos,split,n-1);
+    const score=is.n>=3?is.ret/Math.max(is.dd,0.05):-9;return{s,pos,is,oos,score};});
+  const best=res.reduce((a,b)=>b.score>a.score?b:a);
+  const valid=best.score>0&&best.oos.ret>0&&best.oos.n>=2;
+  const pos=best.pos,last=n-1;let k=last;while(k>WARM&&pos[k-1]===pos[last])k--;
+  const since=last-k;let sig;
+  if(pos[last])sig=!valid?'WEAK':since<=recent?'BUY':'HOLD';else sig=(since<=recent&&k>WARM)?'SELL':'WAIT';
+  const oosDays=(n-1-split)/barsPerDay;
+  const week=best.oos.ret>-1?Math.pow(1+best.oos.ret,7/Math.max(oosDays,7))-1:-1;
+  return{I,res,best,valid,sig,since,k,split,week,oosDays,full:backtest(d.c,pos,WARM,n-1)};}
+function profile(d,btc){const c=d.c,n=c.length,r=[];for(let i=1;i<n;i++)r.push(c[i]/c[i-1]-1);
+  const s=sd(r);let peak=c[0],maxDD=0;for(const v of c){peak=Math.max(peak,v);maxDD=Math.max(maxDD,1-v/peak);}
+  const dow=Array.from({length:7},()=>[]);for(let i=1;i<n;i++)dow[new Date(d.t[i]).getUTCDay()].push(r[i-1]);
+  const dowAvg=dow.map(mean);const ev=(test)=>{const f=[];for(let i=1;i<n-3;i++)if(test(r[i-1]))f.push(c[i+3]/c[i]-1);return{n:f.length,avg:f.length?mean(f):null,win:f.length?f.filter(x=>x>0).length/f.length:null};};
+  const a=r.slice(0,-1),b=r.slice(1),ma=mean(a),mb=mean(b);let cov=0;for(let i=0;i<a.length;i++)cov+=(a[i]-ma)*(b[i]-mb);
+  const ac=cov/((a.length-1)*sd(a)*sd(b)||1);
+  let corr=null;if(btc){corr=corrTail(r,btc,90);}
+  const s50=mean(c.slice(-50)),s200=mean(c.slice(-200)),p=c[n-1];
+  const trend=p>s50&&s50>s200?'Alta':p<s50&&s50<s200?'Baixa':'Lateral';
+  const ret=k=>n>k?p/c[n-1-k]-1:null;
+  return{vol:s*Math.sqrt(7),volAnn:s*Math.sqrt(365),maxDD,ddNow:1-p/peak,dowAvg,bestDow:dowAvg.indexOf(Math.max(...dowAvg)),worstDow:dowAvg.indexOf(Math.min(...dowAvg)),
+    afterDrop:ev(x=>x<-1.5*s),afterPump:ev(x=>x>1.5*s),ac,corr,trend,r7:ret(7),r30:ret(30),r90:ret(90),r365:ret(365),thr:1.5*s,days:n,rets:r.slice(-90)};}
+function corrTail(a,b,k){const x=a.slice(-k),y=b.slice(-k);if(x.length<k||y.length<k)return null;const mx=mean(x),my=mean(y);let c=0;for(let i=0;i<k;i++)c+=(x[i]-mx)*(y[i]-my);return c/((k-1)*sd(x)*sd(y)||1);}
+//</core>
+
+// ===================== ESTADO & BASE LOCAL =====================
+const DOW=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const SIGL={BUY:'COMPRAR',HOLD:'MANTER',SELL:'VENDER',WAIT:'AGUARDAR',WEAK:'SINAL FRACO'};
+const $=s=>document.querySelector(s);
+const db={get(k,def){try{const v=localStorage.getItem('cp_'+k);return v?JSON.parse(v):def;}catch(e){return def;}},set(k,v){try{localStorage.setItem('cp_'+k,JSON.stringify(v));}catch(e){}}};
+let tf=db.get('tf','1d'), cur=db.get('cur','BRL'), usdbrl=db.get('usdbrl',null);
+let K={}, A={}, P={}, live={}, sel=db.get('sel','BTC'), fng=null, tab='painel';
+let pf=db.get('pf',{cash:null,start:null,pos:[],closed:[]});
+function sigHistory(){const out=[],step=tf==='1d'?864e5:144e5;
+  for(const c of COINS){const a=A[c.sym],d=K[c.sym]?.d;if(!a)continue;
+    for(const t of a.full.trades){out.push({t:d.t[t.i0]+step,sym:c.sym,sig:'BUY',p:d.c[t.i0],rule:a.best.s.name});if(!t.open)out.push({t:d.t[t.i1]+step,sym:c.sym,sig:'SELL',p:d.c[t.i1],rule:a.best.s.name,r:t.r});}}
+  return out.sort((x,y)=>y.t-x.t);}
+
+// ===================== FORMATAÇÃO =====================
+function fm(usd,compact){if(usd==null||isNaN(usd))return'—';let v=usd,c='USD';if(cur==='BRL'){if(!usdbrl)return'—';v*=usdbrl;c='BRL';}
+  const a=Math.abs(v),o={style:'currency',currency:c};
+  if(compact){o.notation='compact';o.maximumFractionDigits=1;}else if(a>=1000)o.maximumFractionDigits=0;else if(a>=1)o.maximumFractionDigits=2;else if(a>=0.01)o.maximumFractionDigits=4;else o.maximumFractionDigits=8;
+  if(!compact)o.minimumFractionDigits=Math.min(2,o.maximumFractionDigits);
+  return new Intl.NumberFormat('pt-BR',o).format(v);}
+const fm2=usd=>{if(usd==null||isNaN(usd))return'—';const v=cur==='BRL'?usd*(usdbrl||0):usd;return new Intl.NumberFormat('pt-BR',{style:'currency',currency:cur==='BRL'?'BRL':'USD'}).format(v);};
+const pc=(x,d=1)=>x==null||isNaN(x)?'—':(x>=0?'+':'')+(x*100).toFixed(d).replace('.',',')+'%';
+const pcn=(x,d=0)=>x==null?'—':(x*100).toFixed(d).replace('.',',')+'%';
+const cl=x=>x==null?'':x>=0?'up':'dn';
+const dt=(t,h)=>new Date(t).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'})+(h?' '+new Date(t).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'');
+const price=sym=>live[sym]?.p??K[sym]?.last??null;
+
+// ===================== DADOS =====================
+const HOSTS=['https://data-api.binance.vision','https://api.binance.com','https://api1.binance.com'];
+async function api(path){let err;for(const h of HOSTS){try{const r=await fetch(h+path);if(r.ok)return await r.json();err=new Error(r.status);}catch(e){err=e;}}throw err;}
+async function getK(pair,interval){
+  const key='k_'+pair+'_'+interval;
+  try{const raw=await api(`/api/v3/klines?symbol=${pair}&interval=${interval}&limit=1000`);
+    const last=+raw[raw.length-1][4];const closed=raw.filter(k=>k[6]<Date.now());
+    const d={t:closed.map(k=>k[0]),h:closed.map(k=>+k[2]),l:closed.map(k=>+k[3]),c:closed.map(k=>+k[4]),last,ts:Date.now()};
+    db.set(key,d);return d;
+  }catch(e){const c=db.get(key,null);if(c){c.cached=true;return c;}throw e;}
+}
+async function loadAll(){
+  setSt('poll','Baixando histórico…');let done=0,fail=0;const total=COINS.length;
+  const q=[...COINS];
+  async function worker(){while(q.length){const c=q.shift();try{
+      const day=await getK(c.pair,'1d');const d=tf==='1d'?day:await getK(c.pair,tf);
+      K[c.sym]={day,d,last:d.last};
+    }catch(e){fail++;console.warn(c.sym,e);}
+    done++;$('#prog i').style.width=(done/total*100)+'%';}}
+  await Promise.all([worker(),worker(),worker(),worker()]);
+  try{const j=await api('/api/v3/ticker/price?symbol=USDTBRL');usdbrl=+j.price;db.set('usdbrl',usdbrl);}catch(e){}
+  if(!Object.keys(K).length){setSt('','Sem conexão com a Binance e sem base salva. Verifique a internet e toque em ↻');return;}
+  compute();
+  setSt(wsOn?'live':'poll',wsOn?'Ao vivo':(fail?'Dados parciais (base salva)':'Atualizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})));
+  setTimeout(()=>$('#prog').style.visibility='hidden',600);
+}
+function compute(){
+  const bpd=tf==='1d'?1:6,recent=tf==='1d'?2:3;
+  const btcR=K.BTC?(()=>{const c=K.BTC.day.c,r=[];for(let i=1;i<c.length;i++)r.push(c[i]/c[i-1]-1);return r;})():null;
+  for(const c of COINS){const k=K[c.sym];if(!k)continue;
+    A[c.sym]=analyze(k.d,bpd,recent);P[c.sym]=profile(k.day,c.sym==='BTC'?null:btcR);}
+  // grava perfis e mudanças de sinal na base
+  const prof={};for(const s in P){const p=P[s];prof[s]={tendencia:p.trend,oscSemanal:p.vol,piorQueda:p.maxDD,quedaAtual:p.ddNow,corrBTC:p.corr,aposQueda:p.afterDrop,aposAlta:p.afterPump,melhorDia:DOW[p.bestDow],piorDia:DOW[p.worstDow],autocorr:p.ac,regra:A[s]?.best.s.name,validada:A[s]?.valid};}
+  db.set('perfis',{ts:Date.now(),tf,perfis:prof});
+  if(pf.cash==null){const s=usdbrl?1000/usdbrl:200;pf={cash:s,start:s,pos:[],closed:[]};db.set('pf',pf);}
+  render();
+}
+let ws,wsOn=false;
+function connectWS(){
+  const streams=[...COINS.map(c=>c.pair.toLowerCase()+'@miniTicker'),'usdtbrl@miniTicker'].join('/');
+  try{ws=new WebSocket('wss://data-stream.binance.vision/stream?streams='+streams);}catch(e){return;}
+  ws.onopen=()=>{wsOn=true;if(Object.keys(A).length)setSt('live','Ao vivo');};
+  ws.onmessage=ev=>{const d=JSON.parse(ev.data).data;if(!d)return;const p=+d.c,o=+d.o;
+    if(d.s==='USDTBRL'){usdbrl=p;return;}
+    const sym=d.s.replace('USDT','');live[sym]={p,ch:o?p/o-1:null};dirty=true;};
+  ws.onclose=()=>{wsOn=false;setTimeout(connectWS,6000);};ws.onerror=()=>{try{ws.close();}catch(e){}};
+}
+let dirty=false;
+setInterval(()=>{if(!dirty)return;dirty=false;liveUpdate();},1500);
+async function loadFng(){try{const r=await fetch('https://api.alternative.me/fng/?limit=1');const j=(await r.json()).data[0];
+  fng={v:+j.value,t:{'Extreme Fear':'Medo extremo','Fear':'Medo','Neutral':'Neutro','Greed':'Ganância','Extreme Greed':'Ganância extrema'}[j.value_classification]||''};renderKpis();}catch(e){}}
+function setSt(c,t){$('#dot').className='dot '+c;$('#st').textContent=t;}
+
+// ===================== GRÁFICOS (SVG próprio) =====================
+function lineChart(el,{labels,series,markers=[],guides=[],vline=null,fmt=v=>v,height=240}){
+  const W=el.clientWidth;if(!W)return;const H=height,m={l:6,r:62,t:10,b:20},n=labels.length;
+  let lo=Infinity,hi=-Infinity;for(const s of series)for(const v of s.data)if(v!=null){lo=Math.min(lo,v);hi=Math.max(hi,v);}
+  for(const g of guides){lo=Math.min(lo,g);hi=Math.max(hi,g);}const pad=(hi-lo)*0.06||1;lo-=pad;hi+=pad;
+  const x=i=>m.l+i/(n-1)*(W-m.l-m.r),y=v=>m.t+(1-(v-lo)/(hi-lo))*(H-m.t-m.b);
+  let g='';for(let k=0;k<=3;k++){const v=lo+(hi-lo)*k/3,yy=y(v);g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${yy}" y2="${yy}" stroke="#33332f" stroke-width="1"/><text x="${W-m.r+6}" y="${yy+4}" fill="#96958a" font-size="11">${fmt(v)}</text>`;}
+  for(const gv of guides)g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(gv)}" y2="${y(gv)}" stroke="#96958a" stroke-width="1" stroke-dasharray="4 4"/>`;
+  for(let k=0;k<4;k++){const i=Math.round(k*(n-1)/3);g+=`<text x="${x(i)}" y="${H-5}" fill="#96958a" font-size="11" text-anchor="${k===0?'start':k===3?'end':'middle'}">${labels[i]}</text>`;}
+  if(vline!=null&&vline>=0&&vline<n)g+=`<line x1="${x(vline)}" x2="${x(vline)}" y1="${m.t}" y2="${H-m.b}" stroke="#c3c2b7" stroke-width="1" stroke-dasharray="2 4"/>`;
+  for(const s of series){let p='',pen=false;s.data.forEach((v,i)=>{if(v==null){pen=false;return;}p+=(pen?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1);pen=true;});
+    g+=`<path d="${p}" fill="none" stroke="${s.color}" stroke-width="${s.w||2}" stroke-linejoin="round"/>`;}
+  for(const k of markers){const X=x(k.i),Y=y(k.v);g+=k.buy?`<path d="M${X} ${Y+6}l6 10h-12z" fill="#3dbb5e" stroke="#1a1a19" stroke-width="1.5"/>`:`<path d="M${X} ${Y-6}l6 -10h-12z" fill="#e66767" stroke="#1a1a19" stroke-width="1.5"/>`;}
+  g+=`<line id="cx" y1="${m.t}" y2="${H-m.b}" stroke="#c3c2b7" stroke-width="1" visibility="hidden"/>`;
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" height="${H}">${g}</svg><div class="tip"></div>`;
+  const svg=el.firstChild,tip=el.lastChild,cx=svg.querySelector('#cx');
+  const move=e=>{const r=svg.getBoundingClientRect(),px=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
+    const i=Math.max(0,Math.min(n-1,Math.round((px-m.l)/(W-m.l-m.r)*(n-1))));cx.setAttribute('x1',x(i));cx.setAttribute('x2',x(i));cx.setAttribute('visibility','visible');
+    tip.innerHTML=`<b>${labels[i]}</b><br>`+series.filter(s=>s.data[i]!=null).map(s=>`<i style="background:${s.color}"></i>${s.name}: ${fmt(s.data[i])}`).join('<br>');
+    tip.style.display='block';const tw=tip.offsetWidth;tip.style.left=Math.min(Math.max(x(i)+10,0),W-tw-4)+'px';if(x(i)+10+tw>W)tip.style.left=Math.max(0,x(i)-tw-10)+'px';tip.style.top='6px';};
+  const out=()=>{tip.style.display='none';cx.setAttribute('visibility','hidden');};
+  svg.addEventListener('mousemove',move);svg.addEventListener('touchstart',move,{passive:true});svg.addEventListener('touchmove',move,{passive:true});svg.addEventListener('mouseleave',out);svg.addEventListener('touchend',out);
+}
+function hbars(el,rows,fmt,signed=true){ // rows: [{label,v}]
+  const max=Math.max(...rows.map(r=>Math.abs(r.v||0)),1e-9);
+  el.innerHTML=rows.map(r=>{const w=Math.abs(r.v||0)/max*50;const pos=(r.v||0)>=0;
+    const st=signed?(pos?`left:50%;width:${w}%;background:var(--up)`:`right:50%;width:${w}%;background:var(--dn)`):`left:0;width:${w*2}%;background:var(--c1)`;
+    return `<div class="hb"><span>${r.label}</span><span class="t ${signed?'':'ns'}"><i style="${st}"></i></span><span class="n">${fmt(r.v)}</span></div>`;}).join('');
+}
+
+// ===================== RENDER =====================
+function sigBadge(a){return a?`<span class="sig ${a.sig}">${SIGL[a.sig]}</span>`:'<span class="mut">—</span>';}
+function renderKpis(){
+  const as=COINS.map(c=>A[c.sym]).filter(Boolean);
+  const buy=as.filter(a=>a.sig==='BUY').length,hold=as.filter(a=>a.sig==='HOLD').length,sell=as.filter(a=>a.sig==='SELL').length,val=as.filter(a=>a.valid).length;
+  const up=COINS.filter(c=>P[c.sym]?.trend==='Alta').length,down=COINS.filter(c=>P[c.sym]?.trend==='Baixa').length;
+  const clima=down>COINS.length/2?'Mercado em baixa':up>COINS.length/2?'Mercado em alta':'Mercado misto';
+  const v=pfValue();
+  $('#kpis').innerHTML=[
+    ['Comprar agora',buy,`${hold} em “manter”`],['Vender agora',sell,'saídas recentes'],
+    ['Regras validadas',`${val} de ${as.length}`,'passaram no teste cego'],
+    ['Clima',clima,`${up} em alta · ${down} em baixa`],
+    ['Medo & Ganância',fng?fng.v+' / 100':'—',fng?fng.t:''],
+    ['Dólar (USDT)',usdbrl?'R$ '+usdbrl.toFixed(3).replace('.',','):'—','Binance'],
+    ['Carteira simulada',fm2(v),`<span class="${cl(v-pf.start)}">${pc(v/pf.start-1,2)}</span> desde o início`],
+  ].map(k=>`<div class="kpi"><div class="k">${k[0]}</div><div class="v" style="${String(k[1]).length>12?'font-size:15px':''}">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
+}
+function renderPainel(){
+  renderKpis();
+  const acts=COINS.filter(c=>A[c.sym]&&(A[c.sym].sig==='BUY'||A[c.sym].sig==='SELL'));
+  $('#opp').innerHTML=acts.length?acts.map(c=>{const a=A[c.sym];return `<div class="card" style="cursor:pointer" onclick="pick('${c.sym}')"><div class="row" style="justify-content:space-between"><b>${c.name}</b>${sigBadge(a)}</div><div class="s">${a.best.s.name} · há ${a.since} ${tf==='1d'?'dia(s)':'vela(s) de 4h'}</div><div class="s">Teste cego: <span class="${cl(a.best.oos.ret)}">${pc(a.best.oos.ret)}</span> · acerto ${pcn(a.best.oos.win)}</div></div>`;}).join('')
+    :'<span class="note">Nenhum gatilho novo de compra ou venda agora. Em mercado sem sinal, ficar de fora também é uma decisão — a tabela abaixo mostra o que cada regra está esperando.</span>';
+  $('#sigBody').innerHTML=COINS.map(c=>{const a=A[c.sym],p=P[c.sym];if(!p)return'';const ch=live[c.sym]?.ch;
+    return `<tr class="click" onclick="pick('${c.sym}')"><td><b>${c.sym}</b> <span class="mut">${c.name}</span></td><td>${sigBadge(a)}</td><td data-px="${c.sym}">${fm(price(c.sym))}</td><td data-ch="${c.sym}" class="${cl(ch)}">${pc(ch,2)}</td><td class="${cl(p.r7)}">${pc(p.r7)}</td><td class="${cl(p.r30)}">${pc(p.r30)}</td>`+
+    (a?`<td>${a.best.s.name}</td><td><span class="${cl(a.best.oos.ret)}">${pc(a.best.oos.ret)}</span> <span class="val ${a.valid?'ok':'no'}">${a.valid?'validado':'não validado'}</span></td><td>${pcn(a.best.oos.win)} <span class="mut">(${a.best.oos.n})</span></td><td class="${cl(a.week)}">${pc(a.week,2)}</td><td class="${cl(a.best.oos.ret-a.best.oos.bh)}">${pc(a.best.oos.ret-a.best.oos.bh)}</td>`:'<td colspan="5" class="mut">histórico insuficiente</td>')+'</tr>';}).join('');
+  $('#sigCards').innerHTML=COINS.map(c=>{const a=A[c.sym],p=P[c.sym];if(!p)return'';const ch=live[c.sym]?.ch;
+    return `<div class="scard" onclick="pick('${c.sym}')"><div class="r1"><span><b>${c.sym}</b> <span class="mut">${c.name}</span></span>${sigBadge(a)}</div>
+    <div class="r2"><b data-px="${c.sym}">${fm(price(c.sym))}</b><span>24h <span data-ch="${c.sym}" class="${cl(ch)}">${pc(ch,2)}</span> · 7d <span class="${cl(p.r7)}">${pc(p.r7)}</span></span></div>`+
+    (a?`<div class="r3">${a.best.s.name} · teste cego <span class="${cl(a.best.oos.ret)}">${pc(a.best.oos.ret)}</span> <span class="val ${a.valid?'ok':'no'}">${a.valid?'validado':'não validado'}</span> · média/sem. <span class="${cl(a.week)}">${pc(a.week,2)}</span></div>`:'')+'</div>';}).join('');
+  const rows=COINS.filter(c=>P[c.sym]);
+  hbars($('#bar30'),rows.map(c=>({label:c.sym,v:P[c.sym].r30})).sort((a,b)=>b.v-a.v),v=>pc(v));
+  hbars($('#barVol'),rows.map(c=>({label:c.sym,v:P[c.sym].vol})).sort((a,b)=>a.v-b.v),v=>'± '+pcn(v,1),false);
+}
+function renderMoeda(){
+  $('#chips').innerHTML=COINS.map(c=>`<span class="chip ${c.sym===sel?'on':''}" onclick="pick('${c.sym}')">${c.sym}${A[c.sym]&&(A[c.sym].sig==='BUY'||A[c.sym].sig==='SELL')?' •':''}</span>`).join('');
+  const c=COINS.find(x=>x.sym===sel),k=K[sel],a=A[sel],p=P[sel];if(!k||!p){$('#hero').innerHTML='<span class="note">Sem dados para esta moeda.</span>';return;}
+  const d=k.d,n=d.c.length,last=n-1,h4=tf!=='1d';
+  let hero=`<div><div class="mut">${c.name} (${c.sym}) · ${tf==='1d'?'diário':'4 horas'}</div><div class="p" id="heroP">${fm(price(sel))}</div><div>${sigBadge(a)} ${a?`<span class="val ${a.valid?'ok':'no'}">${a.valid?'regra validada':'regra não validada'}</span>`:''}</div></div>`;
+  if(a){const s=a.best.s,why=s.why(d,a.I,last,fm);
+    const posTxt=a.best.pos[last]?`A regra está <b>comprada</b> desde ${dt(d.t[a.k],h4)} a ${fm(d.c[a.k])} — resultado até agora <b class="${cl(price(sel)/d.c[a.k]-1)}">${pc(price(sel)/d.c[a.k]-1)}</b>.`:`A regra está <b>fora</b> desde ${dt(d.t[a.k],h4)}.`;
+    const msg={BUY:'Gatilho de compra recente numa regra que passou no teste cego.',HOLD:'Sem ação: mantenha enquanto não aparecer VENDER.',SELL:'Gatilho de saída recente: a regra encerrou a posição.',WAIT:'Sem gatilho de compra. Aguarde.',WEAK:'O gatilho acionou, mas esta regra não se provou no teste cego — risco maior.'}[a.sig];
+    hero+=`<div style="flex:1;min-width:260px"><h3>${s.name}</h3><div class="note">Compra: ${s.buy}.<br>Venda: ${s.sell}.</div><ul class="reasons">${why.map(w=>`<li>${w[0]?'✅':'⬜'} ${w[1]}</li>`).join('')}</ul><div style="margin-top:6px">${posTxt} ${msg}</div></div>
+    <div style="min-width:200px"><h3>Simular na carteira</h3><div class="row"><input id="buyAmt" type="number" min="1" value="${cur==='BRL'?100:20}" style="width:100px"><button class="pri" onclick="pfBuy('${sel}')">Comprar</button></div><div class="note" style="margin-top:6px">Disponível: ${fm2(pf.cash)}</div></div>`;}
+  $('#hero').innerHTML=hero;
+  const ad=p.afterDrop,ap=p.afterPump;
+  $('#prof').innerHTML=[
+    ['Tendência atual',p.trend,`7d ${pc(p.r7)} · 30d ${pc(p.r30)} · 1 ano ${pc(p.r365,0)}`],
+    ['Oscilação típica','± '+pcn(p.vol,1)+' / semana',`dia “forte” = mais de ${pcn(p.thr,1)}`],
+    ['Pior queda no histórico','−'+pcn(p.maxDD),`agora está ${pcn(p.ddNow)} abaixo do topo`],
+    ['Após queda forte',ad.n?`<span class="${cl(ad.avg)}">${pc(ad.avg)}</span> em 3 dias`:'—',ad.n?`subiu em ${pcn(ad.win)} das ${ad.n} vezes`:''],
+    ['Após alta forte',ap.n?`<span class="${cl(ap.avg)}">${pc(ap.avg)}</span> em 3 dias`:'—',ap.n?`subiu em ${pcn(ap.win)} das ${ap.n} vezes`:''],
+    ['Segue o Bitcoin',p.corr==null?'É a referência':p.corr.toFixed(2).replace('.',','),p.corr==null?'':p.corr>0.7?'anda quase junto':p.corr>0.4?'ligação moderada':'mais independente'],
+    ['Dias da semana',`Melhor: ${DOW[p.bestDow]}`,`Pior: ${DOW[p.worstDow]}`],
+    ['Padrão dia a dia',p.ac>0.05?'Continuação':p.ac<-0.05?'Reversão':'Sem padrão',p.ac>0.05?'movimentos tendem a seguir':p.ac<-0.05?'movimentos tendem a devolver':'um dia não prevê o outro'],
+  ].map(x=>`<div class="card"><div class="k">${x[0]}</div><div class="v">${x[1]}</div><div class="s">${x[2]}</div></div>`).join('');
+  $('#profTxt').textContent=a?`Resumo: ${c.name} está em tendência de ${p.trend.toLowerCase()}, oscila cerca de ${pcn(p.vol,1)} por semana e ${ad.avg>0?'costuma recuperar parte das quedas fortes':'costuma continuar caindo após quedas fortes'}. A regra que melhor funcionou no histórico dela foi “${a.best.s.name}”: ${pc(a.best.oos.ret)} no teste cego (${Math.round(a.oosDays)} dias, ${a.best.oos.n} operações), contra ${pc(a.best.oos.bh)} de quem só segurou a moeda.`:'';
+  if(!a)return;
+  const show=Math.min(n-WARM,300),from=n-show,lab=d.t.slice(from).map(t=>dt(t,h4).slice(0,h4?14:5));
+  const mk=[];for(const t of a.full.trades){if(t.i0>=from)mk.push({i:t.i0-from,v:d.c[t.i0],buy:true});if(!t.open&&t.i1>=from)mk.push({i:t.i1-from,v:d.c[t.i1],buy:false});}
+  lineChart($('#chPrice'),{labels:lab,fmt:v=>fm(v,v*(cur==='BRL'?usdbrl||1:1)>=10000),markers:mk,series:[{name:'Preço',color:'#3987e5',data:d.c.slice(from)},{name:'Média 50',color:'#d95926',data:a.I.s50.slice(from),w:1.5},{name:'Média 200',color:'#199e70',data:a.I.s200.slice(from),w:1.5}],height:280});
+  const eq=a.full.curve.map(v=>v*100),bh=d.c.slice(WARM).map(v=>v/d.c[WARM]*100);
+  lineChart($('#chEq'),{labels:d.t.slice(WARM).map(t=>dt(t).slice(0,8)),fmt:v=>v.toFixed(0),vline:a.split-WARM,series:[{name:'Regra',color:'#3987e5',data:eq},{name:'Só segurar',color:'#d95926',data:bh}]});
+  lineChart($('#chRsi'),{labels:lab,fmt:v=>v.toFixed(0),guides:[30,70],series:[{name:'RSI',color:'#3987e5',data:a.I.rsi.slice(from)}],height:200});
+  hbars($('#barDow'),[1,2,3,4,5,6,0].map(i=>({label:DOW[i],v:p.dowAvg[i]})),v=>pc(v,2));
+  $('#stratBody').innerHTML=a.res.map(r=>`<tr><td>${r===a.best?'★ ':''}${r.s.name}</td><td class="${cl(r.is.ret)}">${pc(r.is.ret)}</td><td class="${cl(r.oos.ret)}">${pc(r.oos.ret)}</td><td>${r.is.n+r.oos.n}</td><td>${pcn(r.oos.win)}</td><td>−${pcn(Math.max(r.is.dd,r.oos.dd))}</td></tr>`).join('')+
+    `<tr><td class="mut">Só segurar a moeda</td><td class="${cl(a.best.is.bh)}">${pc(a.best.is.bh)}</td><td class="${cl(a.best.oos.bh)}">${pc(a.best.oos.bh)}</td><td>—</td><td>—</td><td>−${pcn(p.maxDD)}</td></tr>`;
+}
+// ---- carteira simulada (valores internos em US$) ----
+function pfValue(){return (pf.cash||0)+pf.pos.reduce((s,x)=>s+x.qty*(price(x.sym)||x.price),0);}
+window.pfBuy=sym=>{let amt=+$('#buyAmt').value;if(!(amt>0))return;if(cur==='BRL')amt/=usdbrl;const p=price(sym);if(!p)return;
+  if(amt>pf.cash+1e-9){$('#buyAmt').value=Math.floor((cur==='BRL'?pf.cash*usdbrl:pf.cash)*100)/100;return;}
+  pf.cash-=amt;pf.pos.push({sym,qty:amt*(1-FEE)/p,price:p,cost:amt,t:Date.now()});db.set('pf',pf);show('carteira');};
+window.pfSell=i=>{const x=pf.pos[i],p=price(x.sym);if(!p)return;const got=x.qty*p*(1-FEE);pf.cash+=got;
+  pf.closed.push({sym:x.sym,tin:x.t,tout:Date.now(),pin:x.price,pout:p,pnl:got-x.cost,cost:x.cost});pf.pos.splice(i,1);db.set('pf',pf);renderCarteira();};
+function renderCarteira(){
+  const v=pfValue(),real=pf.closed.reduce((s,x)=>s+x.pnl,0),wk=pf.closed.filter(x=>x.tout>Date.now()-7*864e5).reduce((s,x)=>s+x.pnl,0),wins=pf.closed.filter(x=>x.pnl>0).length;
+  $('#pfK').innerHTML=[['Valor total',fm2(v),`<span class="${cl(v-pf.start)}">${pc(v/pf.start-1,2)}</span>`],['Em caixa',fm2(pf.cash),''],['Realizado (7 dias)',`<span class="${cl(wk)}">${fm2(wk)}</span>`,''],['Realizado (total)',`<span class="${cl(real)}">${fm2(real)}</span>`,pf.closed.length?`${wins} de ${pf.closed.length} com lucro`:'']]
+    .map(k=>`<div class="kpi"><div class="k">${k[0]}</div><div class="v">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
+  $('#pfPos').innerHTML=pf.pos.length?pf.pos.map((x,i)=>{const p=price(x.sym)||x.price,val=x.qty*p,r=val*(1-FEE)/x.cost-1;
+    return `<tr><td><b>${x.sym}</b> <span class="mut">${dt(x.t)}</span></td><td>${fm(x.price)}</td><td>${fm(p)}</td><td>${fm2(val)}</td><td class="${cl(r)}">${pc(r,2)}</td><td>${sigBadge(A[x.sym])}</td><td><button onclick="pfSell(${i})">Vender</button></td></tr>`;}).join('')
+    :'<tr><td colspan="7" class="mut" style="text-align:center">Nenhuma posição. Abra uma moeda com sinal COMPRAR e toque em “Comprar”.</td></tr>';
+  $('#pfClosed').innerHTML=pf.closed.length?[...pf.closed].reverse().slice(0,30).map(x=>`<tr><td><b>${x.sym}</b></td><td>${dt(x.tin)}</td><td>${dt(x.tout)}</td><td class="${cl(x.pnl)}">${fm2(x.pnl)} (${pc(x.pnl/x.cost,2)})</td></tr>`).join(''):'<tr><td colspan="4" class="mut" style="text-align:center">Ainda sem operações encerradas.</td></tr>';
+  const weeks=[];for(let w=7;w>=0;w--){const a=Date.now()-(w+1)*7*864e5,b=Date.now()-w*7*864e5;weeks.push({label:w?`−${w} sem`:'Atual',v:pf.closed.filter(x=>x.tout>a&&x.tout<=b).reduce((s,x)=>s+x.pnl,0)});}
+  hbars($('#pfWeeks'),weeks,v=>fm2(v));
+}
+function renderBase(){
+  const pr=db.get('perfis',null);$('#baseTs').textContent=pr?dt(pr.ts,true):'—';
+  $('#baseBody').innerHTML=COINS.filter(c=>P[c.sym]).map(c=>{const p=P[c.sym],ad=p.afterDrop,ap=p.afterPump;
+    return `<tr class="click" onclick="pick('${c.sym}')"><td><b>${c.sym}</b></td><td>${p.trend}</td><td>± ${pcn(p.vol,1)}</td><td>−${pcn(p.maxDD)}</td><td>−${pcn(p.ddNow)}</td><td>${p.corr==null?'—':p.corr.toFixed(2).replace('.',',')}</td><td class="${cl(ad.avg)}">${pc(ad.avg)} <span class="mut">(${pcn(ad.win)} de ${ad.n})</span></td><td class="${cl(ap.avg)}">${pc(ap.avg)} <span class="mut">(${pcn(ap.win)} de ${ap.n})</span></td><td>${DOW[p.bestDow]}</td><td>${p.ac>0.05?'Continuação':p.ac<-0.05?'Reversão':'Sem padrão'}</td></tr>`;}).join('');
+  const cs=COINS.filter(c=>P[c.sym]);
+  const col=v=>{if(v==null)return'transparent';const a=Math.min(1,Math.abs(v));return v>=0?`rgba(57,135,229,${0.12+a*0.78})`:`rgba(230,103,103,${0.12+a*0.78})`;};
+  $('#heat').innerHTML='<tr><th></th>'+cs.map(c=>`<th>${c.sym}</th>`).join('')+'</tr>'+cs.map(a=>`<tr><th>${a.sym}</th>`+cs.map(b=>{const v=a===b?1:corrTail(P[a.sym].rets,P[b.sym].rets,90);return `<td style="background:${col(v)}" title="${a.sym} × ${b.sym}">${v==null?'':v.toFixed(1).replace('.',',')}</td>`;}).join('')+'</tr>').join('');
+  const siglog=sigHistory();$('#logBody').innerHTML=siglog.length?siglog.slice(0,80).map(x=>{const p=price(x.sym),r=p?p/x.p-1:null;
+    return `<tr><td>${dt(x.t,tf!=='1d')}</td><td><b>${x.sym}</b></td><td><span class="sig ${x.sig}">${SIGL[x.sig]}</span></td><td>${fm(x.p)}</td><td class="${cl(r)}">${pc(r,2)}</td><td>${x.rule}</td></tr>`;}).join(''):'<tr><td colspan="6" class="mut" style="text-align:center">Vazio</td></tr>';
+}
+function render(){({painel:renderPainel,moeda:renderMoeda,carteira:renderCarteira,base:renderBase,guia(){}})[tab]();if(tab!=='painel')renderKpis();}
+function liveUpdate(){
+  if(tab==='painel'){for(const c of COINS){const l=live[c.sym];if(!l)continue;const t=fm(l.p);
+      document.querySelectorAll(`[data-px="${c.sym}"]`).forEach(e=>{if(e.textContent!==t){e.textContent=t;e.classList.remove('flash');void e.offsetWidth;e.classList.add('flash');}});
+      document.querySelectorAll(`[data-ch="${c.sym}"]`).forEach(h=>{h.textContent=pc(l.ch,2);h.className=cl(l.ch);});}renderKpis();}
+  else if(tab==='moeda'){const e=$('#heroP');if(e)e.textContent=fm(price(sel));}
+  else if(tab==='carteira')renderCarteira();
+}
+function show(t){tab=t;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='t-'+t));render();window.scrollTo(0,0);}
+window.pick=s=>{sel=s;db.set('sel',s);show('moeda');};
+
+// ===================== EVENTOS =====================
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.t));
+$('#tf').value=tf;$('#cur').value=cur;
+$('#tf').onchange=e=>{tf=e.target.value;db.set('tf',tf);$('#prog').style.visibility='visible';$('#prog i').style.width='0';loadAll();};
+$('#cur').onchange=e=>{cur=e.target.value;db.set('cur',cur);render();};
+$('#reload').onclick=()=>{$('#prog').style.visibility='visible';$('#prog i').style.width='0';loadAll();};
+$('#pfReset').onclick=()=>{let s=+$('#pfStart').value||1000;if(cur==='BRL')s/=(usdbrl||5);pf={cash:s,start:s,pos:[],closed:[]};db.set('pf',pf);renderCarteira();};
+// ---- levar a carteira para outro aparelho ----
+const pack=()=>JSON.stringify({v:1,pf,tf,cur,sel});
+function unpack(txt){try{let s=txt.trim();if(s[0]!=='{')s=decodeURIComponent(escape(atob(s)));const o=JSON.parse(s);if(!o.pf||!Array.isArray(o.pf.pos)||!Array.isArray(o.pf.closed))throw 0;
+  pf=o.pf;db.set('pf',pf);if(o.cur){cur=o.cur;db.set('cur',cur);$('#cur').value=cur;}if(o.sel){sel=o.sel;db.set('sel',sel);}$('#syncMsg').textContent='Carteira restaurada neste aparelho.';renderCarteira();}
+  catch(e){$('#syncMsg').textContent='Código ou arquivo inválido.';}}
+$('#mkCode').onclick=async()=>{const code=btoa(unescape(encodeURIComponent(pack())));$('#syncTxt').value=code;let m='Código gerado. Copie e cole no outro aparelho.';
+  try{await navigator.clipboard.writeText(code);m='Código copiado. Cole no outro aparelho em “Restaurar”.';}catch(e){}$('#syncMsg').textContent=m;};
+$('#useCode').onclick=()=>unpack($('#syncTxt').value);
+$('#expFile').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([pack()],{type:'application/json'}));a.download='cripto-pro-carteira.json';a.click();};
+$('#impFile').onchange=e=>{const f=e.target.files[0];if(f)f.text().then(unpack);};
+// ---- PWA ----
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+let deferred;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('#inst').style.display='inline-block';});
+$('#inst').onclick=async()=>{if(!deferred)return;deferred.prompt();await deferred.userChoice;deferred=null;$('#inst').style.display='none';};
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(tab==='moeda')renderMoeda();},250);});
+loadAll();connectWS();loadFng();
+setInterval(loadAll,15*60*1000);
+</script>
+</body>
+</html>

@@ -166,6 +166,7 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
     <div class="panel"><h2>Resultado realizado por semana</h2><div id="pfWeeks"></div></div>
     <div class="panel"><h2>Operações encerradas</h2><div class="tw"><table><thead><tr><th>Moeda</th><th>Entrada</th><th>Saída</th><th>Resultado</th></tr></thead><tbody id="pfClosed"></tbody></table></div></div>
   </div>
+  <div class="panel"><h2>Minha conta Binance <span class="val">só leitura</span></h2><div id="acct"></div></div>
   <div class="panel"><h2>Usar em outro celular ou computador</h2>
     <p class="note">O histórico das moedas, os perfis e os sinais são recalculados sozinhos em qualquer aparelho. Só a sua carteira simulada precisa ser levada: gere o código aqui e restaure no outro aparelho.</p>
     <textarea id="syncTxt" placeholder="Cole aqui o código gerado no outro aparelho"></textarea>
@@ -464,6 +465,7 @@ function renderCarteira(){
   $('#pfClosed').innerHTML=pf.closed.length?[...pf.closed].reverse().slice(0,30).map(x=>`<tr><td><b>${x.sym}</b></td><td>${dt(x.tin)}</td><td>${dt(x.tout)}</td><td class="${cl(x.pnl)}">${fm2(x.pnl)} (${pc(x.pnl/x.cost,2)})</td></tr>`).join(''):'<tr><td colspan="4" class="mut" style="text-align:center">Ainda sem operações encerradas.</td></tr>';
   const weeks=[];for(let w=7;w>=0;w--){const a=Date.now()-(w+1)*7*864e5,b=Date.now()-w*7*864e5;weeks.push({label:w?`−${w} sem`:'Atual',v:pf.closed.filter(x=>x.tout>a&&x.tout<=b).reduce((s,x)=>s+x.pnl,0)});}
   hbars($('#pfWeeks'),weeks,v=>fm2(v));
+  renderAcct();if(bk&&!acctBusy&&Date.now()-acctTs>60000)loadAcct();
 }
 function renderBase(){
   const pr=db.get('perfis',null);$('#baseTs').textContent=pr?dt(pr.ts,true):'—';
@@ -493,6 +495,48 @@ $('#tf').onchange=e=>{tf=e.target.value;db.set('tf',tf);$('#prog').style.visibil
 $('#cur').onchange=e=>{cur=e.target.value;db.set('cur',cur);render();};
 $('#reload').onclick=()=>{$('#prog').style.visibility='visible';$('#prog i').style.width='0';loadAll();};
 $('#pfReset').onclick=()=>{let s=+$('#pfStart').value||1000;if(cur==='BRL')s/=(usdbrl||5);pf={cash:s,start:s,pos:[],closed:[]};db.set('pf',pf);renderCarteira();};
+// ---- conta Binance (só leitura, via WebSocket API assinada) ----
+let bk=db.get('bk',null),acct=null,acctTs=0,acctMsg='',acctBusy=false,allPx=null;
+const STABLE={USDT:1,USDC:1,FDUSD:1,BUSD:1,TUSD:1,DAI:1};
+async function hmacHex(secret,msg){const e=new TextEncoder(),k=await crypto.subtle.importKey('raw',e.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const s=await crypto.subtle.sign('HMAC',k,e.encode(msg));return [...new Uint8Array(s)].map(b=>b.toString(16).padStart(2,'0')).join('');}
+function wsCall(method,params){return new Promise((res,rej)=>{let done=false;const w=new WebSocket('wss://ws-api.binance.com:443/ws-api/v3');
+  const fin=(f,v)=>{if(done)return;done=true;clearTimeout(to);try{w.close();}catch(e){}f(v);};
+  const to=setTimeout(()=>fin(rej,new Error('A Binance não respondeu. Tente de novo.')),15000);
+  w.onopen=()=>w.send(JSON.stringify({id:'cp'+Date.now(),method,params}));
+  w.onmessage=ev=>{let j;try{j=JSON.parse(ev.data);}catch(e){return;}if(j.status===200)fin(res,j.result);else fin(rej,Object.assign(new Error(j.error?.msg||('Erro '+j.status)),{code:j.error?.code}));};
+  w.onerror=()=>fin(rej,new Error('Não foi possível conectar à Binance.'));});}
+async function loadAcct(){if(!bk||acctBusy)return;acctBusy=true;acctMsg='Consultando a Binance…';renderAcct();
+  try{if(!window.crypto?.subtle)throw new Error('Este navegador só permite a conexão quando o app é aberto pelo endereço https.');
+    let off=0;try{off=(await api('/api/v3/time')).serverTime-Date.now();}catch(e){}
+    const p={apiKey:bk.k,omitZeroBalances:true,recvWindow:10000,timestamp:Date.now()+off};
+    p.signature=await hmacHex(bk.s,Object.keys(p).sort().map(k=>k+'='+p[k]).join('&'));
+    acct=await wsCall('account.status',p);acctTs=Date.now();acctMsg='';
+    if(!allPx){allPx={};try{(await api('/api/v3/ticker/price')).forEach(x=>allPx[x.symbol]=+x.price);}catch(e){}}
+  }catch(e){acct=null;acctTs=Date.now();acctMsg=({'-2015':'A Binance recusou a chave: confira se copiou certo, se a leitura está habilitada e se não há restrição de IP.','-2014':'Formato da chave de API inválido.','-1022':'Assinatura recusada: confira a chave secreta.','-1021':'Relógio do aparelho fora de sincronia. Ajuste a hora automática e tente de novo.'})[e.code]||e.message;}
+  acctBusy=false;renderAcct();}
+function assetUsd(a){if(STABLE[a])return 1;if(a==='BRL')return usdbrl?1/usdbrl:null;const p=price(a)??allPx?.[a+'USDT'];if(p)return p;if(a.startsWith('LD')&&a.length>3)return assetUsd(a.slice(2));return null;}
+function renderAcct(){const el=$('#acct');if(!el)return;
+  if(!bk){if($('#bkK')){$('#bkMsg').textContent=acctMsg;return;}el.innerHTML=`<p class="note">Mostra seus saldos reais ao lado dos sinais. O app <b>não envia ordens</b>: comprar e vender continua sendo feito por você, no app da Binance.</p>
+    <ol class="guide note"><li>Na Binance: Perfil → Gerenciamento de API → Criar API (gerada pelo sistema).</li><li>Deixe marcada <b>apenas “Habilitar leitura”</b>. Não habilite negociação nem saque.</li><li>Cole as duas chaves abaixo. Elas ficam guardadas só neste aparelho e não entram no código de transferência.</li></ol>
+    <input id="bkK" placeholder="Chave de API (API Key)" autocomplete="off" autocapitalize="off" spellcheck="false" style="width:100%;margin-bottom:8px">
+    <input id="bkS" type="password" placeholder="Chave secreta (Secret Key)" autocomplete="off" style="width:100%;margin-bottom:8px">
+    <div class="row"><button class="pri" onclick="bkSave()">Conectar</button><span class="note" id="bkMsg">${acctMsg}</span></div>`;return;}
+  let html='';
+  if(acct){const rows=acct.balances.map(b=>{const q=+b.free+ +b.locked,u=assetUsd(b.asset);return{a:b.asset,q,lock:+b.locked,v:u==null?null:q*u};}).filter(r=>r.q>0).sort((x,y)=>(y.v??-1)-(x.v??-1));
+    const total=rows.reduce((s,r)=>s+(r.v||0),0),big=rows.filter(r=>r.v==null||r.v>=1),small=rows.length-big.length;
+    if(acct.canWithdraw||acct.canTrade)html+=`<div class="warnbox">Esta chave permite ${[acct.canTrade?'negociação':'',acct.canWithdraw?'saque':''].filter(Boolean).join(' e ')} na conta. O app só lê saldos, mas é mais seguro apagar essa chave na Binance e criar outra apenas com leitura.</div>`;
+    html+=`<div class="kpis"><div class="kpi"><div class="k">Saldo estimado (Spot)</div><div class="v">${fm2(total)}</div><div class="s">${rows.length} ativo(s)</div></div></div>
+    <div class="tw"><table><thead><tr><th>Ativo</th><th>Quantidade</th><th>Valor</th><th>% da conta</th><th>Sinal</th></tr></thead><tbody>`+
+    (big.length?big.map(r=>{const base=r.a.startsWith('LD')&&!price(r.a)?r.a.slice(2):r.a,a=A[base];
+      return `<tr ${a?`class="click" onclick="pick('${base}')"`:''}><td><b>${r.a}</b>${r.lock?' <span class="mut">(parte em ordem)</span>':''}</td><td>${r.q.toLocaleString('pt-BR',{maximumFractionDigits:8})}</td><td>${r.v==null?'<span class="mut">sem cotação</span>':fm2(r.v)}</td><td>${r.v==null||!total?'—':pcn(r.v/total)}</td><td>${a?sigBadge(a):'<span class="mut">—</span>'}</td></tr>`;}).join('')
+      :'<tr><td colspan="5" class="mut" style="text-align:center">Nenhum saldo relevante na carteira Spot.</td></tr>')+
+    `</tbody></table></div>`+(small?`<p class="note">+ ${small} saldo(s) abaixo de US$ 1 não listado(s).</p>`:'');}
+  html+=`<div class="row" style="margin-top:8px"><button onclick="loadAcct()">Atualizar saldos</button><button class="dan" onclick="bkClear()">Desconectar e apagar chave</button><span class="note">${acctMsg||(acct?'Atualizado às '+new Date(acctTs).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' · só carteira Spot':'')}</span></div>`;
+  el.innerHTML=html;}
+window.loadAcct=loadAcct;
+window.bkSave=()=>{const k=$('#bkK').value.trim(),s=$('#bkS').value.trim();if(k.length<20||s.length<20){acctMsg='Cole as duas chaves completas.';renderAcct();return;}bk={k,s};db.set('bk',bk);acctTs=0;loadAcct();};
+window.bkClear=()=>{bk=null;acct=null;acctMsg='';try{localStorage.removeItem('cp_bk');}catch(e){}renderAcct();};
 // ---- levar a carteira para outro aparelho ----
 const pack=()=>JSON.stringify({v:1,pf,tf,cur,sel});
 function unpack(txt){try{let s=txt.trim();if(s[0]!=='{')s=decodeURIComponent(escape(atob(s)));const o=JSON.parse(s);if(!o.pf||!Array.isArray(o.pf.pos)||!Array.isArray(o.pf.closed))throw 0;

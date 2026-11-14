@@ -2,6 +2,9 @@
 
 Formato: MAIOR.MENOR.CORREÇÃO — MAIOR em reformulações grandes, MENOR quando entra função nova, CORREÇÃO em ajustes.
 
+## 1.1.0 — 2026-11-13
+- Nova aba Logs: registro de tudo o que acontece no aparelho (sistema, sinais, carteira, bot, área segura, ordens reais, central e ajustes), com filtro, busca, exportação e limpeza
+
 ## 1.0.0 — 2026-11-13
 Primeira versão numerada. Reúne:
 - Painel de sinais com teste cego (70% treino / 30% teste) e perfil de comportamento por moeda

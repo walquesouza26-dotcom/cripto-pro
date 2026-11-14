@@ -90,6 +90,7 @@ ol.guide{padding-left:18px;margin:0} ol.guide li{margin-bottom:8px}
 textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(--tx);background:var(--s2);border:1px solid var(--line);border-radius:8px;padding:8px}
 #inst{display:none}
 @media(max-width:640px){
+  nav button{font-size:10px}
   body{padding-bottom:calc(66px + env(safe-area-inset-bottom))}
   .wrap{padding:10px;padding-top:calc(10px + env(safe-area-inset-top))}
   header{margin-bottom:8px} h1{font-size:17px} h1 small{display:none}
@@ -122,7 +123,7 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
 <div id="prog"><i></i></div>
 <nav id="nav">
   <button data-t="painel" data-i="📊" class="on">Painel</button><button data-t="moeda" data-i="🪙">Moeda</button>
-  <button data-t="carteira" data-i="💼">Carteira</button><button data-t="bot" data-i="🤖">Bot</button><button data-t="base" data-i="🧠">Base</button><button data-t="guia" data-i="📘">Guia</button>
+  <button data-t="carteira" data-i="💼">Carteira</button><button data-t="bot" data-i="🤖">Bot</button><button data-t="base" data-i="🧠">Base</button><button data-t="logs" data-i="📜">Logs</button><button data-t="guia" data-i="📘">Guia</button>
 </nav>
 
 <section class="tab on" id="t-painel">
@@ -241,6 +242,15 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
     </div>
 </section>
 
+<section class="tab" id="t-logs">
+  <div class="panel"><h2>Registro de atividades</h2>
+    <p class="note">Tudo o que acontece neste aparelho fica anotado aqui, do mais recente para o mais antigo. Senhas e chaves nunca são registradas.</p>
+    <div class="chips" id="logCats"></div>
+    <input id="logQ" placeholder="Buscar no registro (ex.: BTC, venda, senha)" style="width:100%;margin-bottom:10px">
+    <div class="tw"><table><thead><tr><th>Quando</th><th>Tipo</th><th style="text-align:left">O que aconteceu</th></tr></thead><tbody id="logRows"></tbody></table></div>
+    <div class="row" style="margin-top:10px"><button id="logExp">Exportar registro</button><button class="dan" id="logClr">Limpar registro</button><span class="note" id="logInfo"></span></div></div>
+</section>
+
 <section class="tab" id="t-guia">
   <div class="panel"><h2>Como a plataforma decide</h2>
     <ol class="guide">
@@ -265,7 +275,7 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
 </div>
 
 <script>
-const APP_VERSION='1.0.0';document.getElementById('appVer').textContent=APP_VERSION;
+const APP_VERSION='1.1.0';document.getElementById('appVer').textContent=APP_VERSION;
 //<core>
 const COINS=[['BTC','Bitcoin'],['ETH','Ethereum'],['XRP','XRP'],['BNB','BNB'],['SOL','Solana'],['TRX','TRON'],['DOGE','Dogecoin'],['ADA','Cardano'],['LINK','Chainlink'],['LTC','Litecoin'],['AVAX','Avalanche'],['SUI','Sui'],['DOT','Polkadot'],['ZEC','Zcash'],['SHIB','Shiba Inu']].map(([sym,name])=>({sym,name,pair:sym+'USDT'}));
 const FEE=0.001, WARM=200, SPLIT=0.7;
@@ -337,6 +347,10 @@ const $=s=>document.querySelector(s);
 const db={get(k,def){try{const v=localStorage.getItem('cp_'+k);return v?JSON.parse(v):def;}catch(e){return def;}},set(k,v){try{localStorage.setItem('cp_'+k,JSON.stringify(v));}catch(e){}}};
 let tf=db.get('tf','1d'), cur=db.get('cur','BRL'), usdbrl=db.get('usdbrl',null);
 let K={}, A={}, P={}, live={}, sel=db.get('sel','BTC'), fng=null, tab='painel';
+let logs=db.get('log',[]),logCat='Todos',logAsk=false;
+const LOGCATS=['Sistema','Sinais','Carteira','Bot','Área segura','Ordens reais','Central','Ajustes'];
+function logEv(cat,msg,quiet=0){const now=Date.now();if(quiet){for(let i=logs.length-1;i>=0&&now-logs[i].t<quiet;i--)if(logs[i].c===cat&&logs[i].m===msg)return;}
+  logs.push({t:now,c:cat,m:String(msg).slice(0,300)});if(logs.length>2000)logs=logs.slice(-2000);db.set('log',logs);if(typeof tab!=='undefined'&&tab==='logs')renderLogs();}
 let pf=db.get('pf',{cash:null,start:null,pos:[],closed:[]});
 let bot=Object.assign({on:false,frac:0.2,max:5,tpM:1,slM:1,entry:'ALL',log:[],done:{},last:0},db.get('bot',{}));
 let dev=db.get('dev',null);if(!dev){const r=()=>Array.from(crypto.getRandomValues(new Uint8Array(4)),b=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b%32]).join('');dev={id:'AP-'+r()+'-'+r()};db.set('dev',dev);}
@@ -380,7 +394,8 @@ async function loadAll(){
     done++;$('#prog i').style.width=(done/total*100)+'%';}}
   await Promise.all([worker(),worker(),worker(),worker()]);
   try{const j=await api('/api/v3/ticker/price?symbol=USDTBRL');usdbrl=+j.price;db.set('usdbrl',usdbrl);}catch(e){}
-  if(!Object.keys(K).length){setSt('','Sem conexão com a Binance e sem base salva. Verifique a internet e toque em ↻');return;}
+  if(!Object.keys(K).length){logEv('Sistema','Falha ao baixar o histórico: sem conexão com a Binance e sem base salva',6e5);setSt('','Sem conexão com a Binance e sem base salva. Verifique a internet e toque em ↻');return;}
+  logEv('Sistema',`Histórico atualizado e análise refeita: ${Object.keys(K).length} moedas (${tf==='1d'?'diário':'4 horas'})`+(fail?` · ${fail} com falha, usando base salva`:''));
   compute();
   setSt(wsOn?'live':'poll',wsOn?'Ao vivo':(fail?'Dados parciais (base salva)':'Atualizado '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})));
   setTimeout(()=>$('#prog').style.visibility='hidden',600);
@@ -394,17 +409,18 @@ function compute(){
   const prof={};for(const s in P){const p=P[s];prof[s]={tendencia:p.trend,oscSemanal:p.vol,piorQueda:p.maxDD,quedaAtual:p.ddNow,corrBTC:p.corr,aposQueda:p.afterDrop,aposAlta:p.afterPump,melhorDia:DOW[p.bestDow],piorDia:DOW[p.worstDow],autocorr:p.ac,regra:A[s]?.best.s.name,validada:A[s]?.valid};}
   db.set('perfis',{ts:Date.now(),tf,perfis:prof});
   if(pf.cash==null){const s=usdbrl?1000/usdbrl:200;pf={cash:s,start:s,pos:[],closed:[]};db.set('pf',pf);}
+  const ls=db.get('lastsig',{});for(const c of COINS){const a=A[c.sym];if(!a)continue;const k=c.sym+tf;if(ls[k]&&ls[k]!==a.sig)logEv('Sinais',`${c.sym}: sinal mudou de ${SIGL[ls[k]]} para ${SIGL[a.sig]} a ${fm(K[c.sym].last)} · regra ${a.best.s.name}${a.valid?' (validada)':' (não validada)'}`);ls[k]=a.sig;}db.set('lastsig',ls);
   botTick();render();
 }
 let ws,wsOn=false;
 function connectWS(){
   const streams=[...COINS.map(c=>c.pair.toLowerCase()+'@miniTicker'),'usdtbrl@miniTicker'].join('/');
   try{ws=new WebSocket('wss://data-stream.binance.vision/stream?streams='+streams);}catch(e){return;}
-  ws.onopen=()=>{wsOn=true;if(Object.keys(A).length)setSt('live','Ao vivo');};
+  ws.onopen=()=>{wsOn=true;logEv('Sistema','Preços ao vivo conectados',6e5);if(Object.keys(A).length)setSt('live','Ao vivo');};
   ws.onmessage=ev=>{const d=JSON.parse(ev.data).data;if(!d)return;const p=+d.c,o=+d.o;
     if(d.s==='USDTBRL'){usdbrl=p;return;}
     const sym=d.s.replace('USDT','');live[sym]={p,ch:o?p/o-1:null};dirty=true;};
-  ws.onclose=()=>{wsOn=false;setTimeout(connectWS,6000);};ws.onerror=()=>{try{ws.close();}catch(e){}};
+  ws.onclose=()=>{if(wsOn)logEv('Sistema','Conexão de preços ao vivo perdida; tentando reconectar',6e5);wsOn=false;setTimeout(connectWS,6000);};ws.onerror=()=>{try{ws.close();}catch(e){}};
 }
 let dirty=false;
 setInterval(()=>{botTick();if(!dirty)return;dirty=false;liveUpdate();},1500);
@@ -514,15 +530,15 @@ function renderMoeda(){
 function pfValue(){return (pf.cash||0)+pf.pos.reduce((s,x)=>s+x.qty*(price(x.sym)||x.price),0);}
 window.pfBuy=sym=>{const stay=tab==='moeda';let amt=+$('#buyAmt').value;if(!(amt>0))return;if(cur==='BRL')amt/=usdbrl;const p=price(sym);if(!p)return;
   if(amt>pf.cash+1e-9){$('#buyAmt').value=Math.floor((cur==='BRL'?pf.cash*usdbrl:pf.cash)*100)/100;return;}
-  pf.cash-=amt;pf.pos.push({sym,qty:amt*(1-FEE)/p,price:p,cost:amt,t:Date.now()});db.set('pf',pf);stay?renderMoeda():show('carteira');};
+  pf.cash-=amt;pf.pos.push({sym,qty:amt*(1-FEE)/p,price:p,cost:amt,t:Date.now()});db.set('pf',pf);logEv('Carteira',`Compra simulada manual: ${fm2(amt)} em ${sym} a ${fm(p)}`);stay?renderMoeda():show('carteira');};
 function closePos(i){const x=pf.pos[i],p=price(x.sym);if(!p)return null;const got=x.qty*p*(1-FEE);pf.cash+=got;
-  const t={sym:x.sym,tin:x.t,tout:Date.now(),pin:x.price,pout:p,pnl:got-x.cost,cost:x.cost,bot:!!x.bot};pf.closed.push(t);pf.pos.splice(i,1);db.set('pf',pf);return t;}
+  const t={sym:x.sym,tin:x.t,tout:Date.now(),pin:x.price,pout:p,pnl:got-x.cost,cost:x.cost,bot:!!x.bot};pf.closed.push(t);pf.pos.splice(i,1);db.set('pf',pf);if(!x.bot)logEv('Carteira',`Venda simulada manual: ${x.sym} a ${fm(p)} · resultado ${fm2(t.pnl)} (${pc(t.pnl/t.cost,2)})`);return t;}
 window.pfSell=i=>{const x=pf.pos[i],t=closePos(i);if(t&&x.bot){botLog(x.sym,'VENDA','Venda manual pelo usuário',t.pout,t.pnl/t.cost);db.set('bot',bot);}renderCarteira();};
 window.pfSellSym=sym=>{for(let i=pf.pos.length-1;i>=0;i--)if(pf.pos[i].sym===sym){const b=pf.pos[i].bot,t=closePos(i);if(t&&b)botLog(sym,'VENDA','Venda manual pelo usuário',t.pout,t.pnl/t.cost);}db.set('bot',bot);renderMoeda();};
 // ---- BOT (simulado): decide sozinho com limites tirados do histórico de cada moeda ----
 function botLim(sym){const a=A[sym],p=P[sym];if(!a||!p)return null;const cl=a.full.trades.filter(t=>!t.open),w=cl.filter(t=>t.r>0).map(t=>t.r),l=cl.filter(t=>t.r<=0).map(t=>-t.r);
   const c=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));return{tp:c((w.length>=2?mean(w):p.vol)*(bot.tpM||1),0.003,0.3),sl:c((l.length>=2?mean(l):p.vol)*(bot.slM||1),0.005,0.3),nw:w.length,nl:l.length};}
-function botLog(sym,act,why,p,r){bot.log.push({t:Date.now(),sym,act,why,p,r});if(bot.log.length>300)bot.log=bot.log.slice(-300);}
+function botLog(sym,act,why,p,r){logEv('Bot',`${act} ${sym} a ${fm(p)}${r==null?'':' · resultado '+pc(r,2)} · ${why}`);bot.log.push({t:Date.now(),sym,act,why,p,r});if(bot.log.length>300)bot.log=bot.log.slice(-300);}
 function botTick(){if(!bot.on||!Object.keys(A).length)return;let ch=false;bot.last=Date.now();
   for(let i=pf.pos.length-1;i>=0;i--){const x=pf.pos[i];if(!x.bot)continue;const p=price(x.sym),a=A[x.sym];if(!p)continue;const r=x.qty*p*(1-FEE)/x.cost-1;
     const why=r>=x.tp?`Alvo de lucro médio atingido (${pc(x.tp)})`:r<=-x.sl?`Limite de perda média atingido (−${pcn(x.sl,1)})`:(a&&(a.sig==='SELL'||a.sig==='WAIT'))?'A regra da moeda deu saída':null;
@@ -575,6 +591,12 @@ function renderCarteira(){
   hbars($('#pfWeeks'),weeks,v=>fm2(v));
   renderAcct();
 }
+function renderLogs(){
+  $('#logCats').innerHTML=['Todos',...LOGCATS].map(c=>`<span class="chip ${c===logCat?'on':''}" onclick="logSet('${c}')">${c}</span>`).join('');
+  const q=$('#logQ').value.trim().toLowerCase(),rows=logs.filter(x=>(logCat==='Todos'||x.c===logCat)&&(!q||(x.m+' '+x.c).toLowerCase().includes(q)));
+  $('#logRows').innerHTML=rows.length?rows.slice(-300).reverse().map(x=>`<tr><td>${dt(x.t,true)}</td><td><span class="val">${x.c}</span></td><td style="white-space:normal;text-align:left;min-width:190px">${String(x.m).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</td></tr>`).join(''):'<tr><td colspan="3" class="mut" style="text-align:center">Nada registrado com esse filtro.</td></tr>';
+  $('#logInfo').textContent=`${rows.length} de ${logs.length} registro(s)`+(rows.length>300?' · mostrando os 300 mais recentes':'');}
+window.logSet=c=>{logCat=c;renderLogs();};
 function renderBase(){
   const pr=db.get('perfis',null);$('#baseTs').textContent=pr?dt(pr.ts,true):'—';
   $('#baseBody').innerHTML=COINS.filter(c=>P[c.sym]).map(c=>{const p=P[c.sym],ad=p.afterDrop,ap=p.afterPump;
@@ -585,7 +607,7 @@ function renderBase(){
   const siglog=sigHistory();$('#logBody').innerHTML=siglog.length?siglog.slice(0,80).map(x=>{const p=price(x.sym),r=p?p/x.p-1:null;
     return `<tr><td>${dt(x.t,tf!=='1d')}</td><td><b>${x.sym}</b></td><td><span class="sig ${x.sig}">${SIGL[x.sig]}</span></td><td>${fm(x.p)}</td><td class="${cl(r)}">${pc(r,2)}</td><td>${x.rule}</td></tr>`;}).join(''):'<tr><td colspan="6" class="mut" style="text-align:center">Vazio</td></tr>';
 }
-function render(){({painel:renderPainel,moeda:renderMoeda,carteira:renderCarteira,bot:renderBot,base:renderBase,guia(){}})[tab]();if(tab!=='painel')renderKpis();}
+function render(){({painel:renderPainel,moeda:renderMoeda,carteira:renderCarteira,bot:renderBot,base:renderBase,logs:renderLogs,guia(){}})[tab]();if(tab!=='painel')renderKpis();}
 function liveUpdate(){
   if(tab==='painel'){for(const c of COINS){const l=live[c.sym];if(!l)continue;const t=fm(l.p);
       document.querySelectorAll(`[data-px="${c.sym}"]`).forEach(e=>{if(e.textContent!==t){e.textContent=t;e.classList.remove('flash');void e.offsetWidth;e.classList.add('flash');}});
@@ -600,10 +622,10 @@ window.pick=s=>{sel=s;db.set('sel',s);show('moeda');};
 // ===================== EVENTOS =====================
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.t));
 $('#tf').value=tf;$('#cur').value=cur;
-$('#tf').onchange=e=>{tf=e.target.value;db.set('tf',tf);$('#prog').style.visibility='visible';$('#prog i').style.width='0';loadAll();};
-$('#cur').onchange=e=>{cur=e.target.value;db.set('cur',cur);render();};
+$('#tf').onchange=e=>{tf=e.target.value;logEv('Ajustes','Período de análise alterado para '+(tf==='1d'?'diário':'4 horas'));db.set('tf',tf);$('#prog').style.visibility='visible';$('#prog i').style.width='0';loadAll();};
+$('#cur').onchange=e=>{cur=e.target.value;logEv('Ajustes','Moeda de exibição alterada para '+cur);db.set('cur',cur);render();};
 $('#reload').onclick=()=>{$('#prog').style.visibility='visible';$('#prog i').style.width='0';loadAll();};
-$('#pfReset').onclick=()=>{bot.done={};db.set('bot',bot);let s=+$('#pfStart').value||1000;if(cur==='BRL')s/=(usdbrl||5);pf={cash:s,start:s,pos:[],closed:[]};db.set('pf',pf);renderCarteira();};
+$('#pfReset').onclick=()=>{logEv('Carteira','Carteira simulada reiniciada');bot.done={};db.set('bot',bot);let s=+$('#pfStart').value||1000;if(cur==='BRL')s/=(usdbrl||5);pf={cash:s,start:s,pos:[],closed:[]};db.set('pf',pf);renderCarteira();};
 // ---- ÁREA SEGURA: cofre com senha + conta Binance (WebSocket API assinada) ----
 let vault=db.get('vault',null),V=null,vKey=null,vAct=0,vMsg='',vWipe=false,vBusy=false,vFail=db.get('vfail',{n:0,until:0});
 let bk=db.get('bk',null),acct=null,acctTs=0,acctMsg='',acctBusy=false,allPx=null,ord=null,ordMsg='',realLog=db.get('reallog',[]),tOff=null,keyAsk=false;
@@ -621,26 +643,26 @@ window.vCreate=async()=>{const a=$('#vP1').value,b=$('#vP2').value;
   if(a!==b){vMsg='As duas senhas não conferem.';return renderAcct();}
   vBusy=true;vMsg='Criando…';renderAcct();
   try{const salt=crypto.getRandomValues(new Uint8Array(16));vKey=await vDerive(a,salt);V={};if(bk){V={type:'hmac',k:bk.k,s:bk.s};bk=null;try{localStorage.removeItem('cp_bk');}catch(e){}}
-    vault={salt:b64(salt)};await vSave();vAct=Date.now();vMsg='';}catch(e){V=null;vKey=null;vault=null;vMsg='Não foi possível criar: '+e.message;}
+    vault={salt:b64(salt)};await vSave();vAct=Date.now();vMsg='';logEv('Área segura','Área segura criada');}catch(e){V=null;vKey=null;vault=null;vMsg='Não foi possível criar: '+e.message;}
   vBusy=false;renderAcct();if(V?.k)loadAcct();};
 window.vUnlock=async()=>{if(vBusy)return;const left=vFail.until-Date.now();if(left>0){vMsg=`Muitas tentativas. Aguarde ${Math.ceil(left/1000)} s.`;return renderAcct();}
   const pw=$('#vP').value;vBusy=true;vMsg='Abrindo…';renderAcct();
   try{vKey=await vDerive(pw,ub64(vault.salt));const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub64(vault.iv)},vKey,ub64(vault.ct));V=JSON.parse(new TextDecoder().decode(pt));
-    vFail={n:0,until:0};vAct=Date.now();vMsg='';}
-  catch(e){V=null;vKey=null;vFail.n++;if(vFail.n>=5)vFail.until=Date.now()+60000*(vFail.n-4);vMsg='Senha incorreta.'+(vFail.n>=5?` Bloqueado por ${vFail.n-4} min.`:'');}
+    vFail={n:0,until:0};vAct=Date.now();vMsg='';logEv('Área segura','Área segura aberta com a senha');}
+  catch(e){V=null;vKey=null;vFail.n++;logEv('Área segura',`Senha incorreta (tentativa ${vFail.n})`);if(vFail.n>=5)vFail.until=Date.now()+60000*(vFail.n-4);vMsg='Senha incorreta.'+(vFail.n>=5?` Bloqueado por ${vFail.n-4} min.`:'');}
   db.set('vfail',vFail);vBusy=false;renderAcct();if(V?.k)loadAcct();};
-window.vLock=()=>{V=null;vKey=null;acct=null;ord=null;ordMsg='';acctMsg='';vMsg='';keyAsk=false;renderAcct();};
-window.vErase=()=>{if(!vWipe){vWipe=true;return renderAcct();}vWipe=false;vault=null;V=null;vKey=null;acct=null;ord=null;try{localStorage.removeItem('cp_vault');}catch(e){}vMsg='Área segura apagada deste aparelho.';renderAcct();};
-setInterval(()=>{if(V&&Date.now()-vAct>5*60000){vLock();vMsg='Bloqueada por inatividade.';renderAcct();}},15000);
+window.vLock=()=>{if(V)logEv('Área segura','Área segura bloqueada');V=null;vKey=null;acct=null;ord=null;ordMsg='';acctMsg='';vMsg='';keyAsk=false;renderAcct();};
+window.vErase=()=>{if(!vWipe){vWipe=true;return renderAcct();}vWipe=false;logEv('Área segura','Área segura apagada deste aparelho');vault=null;V=null;vKey=null;acct=null;ord=null;try{localStorage.removeItem('cp_vault');}catch(e){}vMsg='Área segura apagada deste aparelho.';renderAcct();};
+setInterval(()=>{if(V&&Date.now()-vAct>5*60000){logEv('Área segura','Bloqueio automático por 5 minutos sem uso');vLock();vMsg='Bloqueada por inatividade.';renderAcct();}},15000);
 // chaves
 window.kGen=async()=>{try{const kp=await crypto.subtle.generateKey({name:'Ed25519'},true,['sign','verify']);
     V.s=b64(await crypto.subtle.exportKey('pkcs8',kp.privateKey));const pub=b64(await crypto.subtle.exportKey('spki',kp.publicKey));
-    V.pub='-----BEGIN PUBLIC KEY-----\n'+pub.match(/.{1,64}/g).join('\n')+'\n-----END PUBLIC KEY-----';V.type='ed';V.k='';await vSave();acctMsg='';}
+    V.pub='-----BEGIN PUBLIC KEY-----\n'+pub.match(/.{1,64}/g).join('\n')+'\n-----END PUBLIC KEY-----';V.type='ed';V.k='';await vSave();acctMsg='';logEv('Área segura','Chave do app gerada (parte pública pronta para cadastrar na Binance)');}
   catch(e){acctMsg='Este navegador não gera esse tipo de chave. Atualize o Chrome/Safari ou use um computador.';}renderAcct();};
 window.kCopy=async()=>{try{await navigator.clipboard.writeText(V.pub);acctMsg='Chave pública copiada.';}catch(e){acctMsg='Selecione o texto e copie manualmente.';}renderAcct();};
-window.kSaveEd=async()=>{const k=$('#edK').value.trim();if(k.length<20){acctMsg='Cole a API Key que a Binance mostrou.';return renderAcct();}V.k=k;await vSave();acctTs=0;loadAcct();};
-window.kSaveH=async()=>{const k=$('#hK').value.trim(),s=$('#hS').value.trim();if(k.length<20||s.length<20){acctMsg='Cole as duas chaves completas.';return renderAcct();}V={type:'hmac',k,s};await vSave();acctTs=0;loadAcct();};
-window.kReset=async()=>{if(!keyAsk){keyAsk=true;return renderAcct();}keyAsk=false;V={};acct=null;ord=null;acctMsg='';await vSave();renderAcct();};
+window.kSaveEd=async()=>{const k=$('#edK').value.trim();if(k.length<20){acctMsg='Cole a API Key que a Binance mostrou.';return renderAcct();}V.k=k;await vSave();logEv('Área segura','API Key da chave do app salva');acctTs=0;loadAcct();};
+window.kSaveH=async()=>{const k=$('#hK').value.trim(),s=$('#hS').value.trim();if(k.length<20||s.length<20){acctMsg='Cole as duas chaves completas.';return renderAcct();}V={type:'hmac',k,s};await vSave();logEv('Área segura','Chave de leitura salva');acctTs=0;loadAcct();};
+window.kReset=async()=>{if(!keyAsk){keyAsk=true;return renderAcct();}keyAsk=false;logEv('Área segura','Chave da Binance removida');V={};acct=null;ord=null;acctMsg='';await vSave();renderAcct();};
 async function hmacHex(secret,msg){const k=await crypto.subtle.importKey('raw',enc(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
   return [...new Uint8Array(await crypto.subtle.sign('HMAC',k,enc(msg)))].map(b=>b.toString(16).padStart(2,'0')).join('');}
 async function signPayload(msg){if(V.type==='ed'){const k=await crypto.subtle.importKey('pkcs8',ub64(V.s),{name:'Ed25519'},false,['sign']);return b64(await crypto.subtle.sign({name:'Ed25519'},k,enc(msg)));}return hmacHex(V.s,msg);}
@@ -657,9 +679,9 @@ async function signed(method,extra={}){if(!V?.k)throw new Error('Área segura bl
 const ERR={'-2015':'A Binance recusou a chave: confira se ela está correta e ativa, e se tem a permissão necessária. Chaves comuns (HMAC) sem IP fixo só permitem leitura — para operar, use a “chave do app”.','-2014':'Formato da chave de API inválido.','-1022':'Assinatura recusada: a chave cadastrada na Binance não corresponde à deste aparelho.','-1021':'Relógio do aparelho fora de sincronia. Ajuste a hora automática e tente de novo.','-2010':'A Binance rejeitou a ordem (saldo insuficiente ou regra do par).','-1013':'Valor ou quantidade fora das regras do par (mínimo/máximo).'};
 const errTxt=e=>{if(e.code===-1021)tOff=null;return ERR[e.code]||e.message;};
 async function loadAcct(){if(!V?.k||acctBusy)return;acctBusy=true;acctMsg='Consultando a Binance…';renderAcct();
-  try{acct=await signed('account.status',{omitZeroBalances:true});acctTs=Date.now();acctMsg='';
+  try{acct=await signed('account.status',{omitZeroBalances:true});acctTs=Date.now();acctMsg='';logEv('Área segura',`Saldos consultados na Binance: ${acct.balances.length} ativo(s)`);
     if(!allPx){allPx={};try{(await api('/api/v3/ticker/price')).forEach(x=>allPx[x.symbol]=+x.price);}catch(e){}}
-  }catch(e){acct=null;acctTs=Date.now();acctMsg=errTxt(e);}
+  }catch(e){acct=null;acctTs=Date.now();acctMsg=errTxt(e);logEv('Área segura','Falha ao consultar saldos: '+acctMsg);}
   acctBusy=false;renderAcct();}
 window.loadAcct=loadAcct;
 function assetUsd(a){if(STABLE[a])return 1;if(a==='BRL')return usdbrl?1/usdbrl:null;const p=price(a)??allPx?.[a+'USDT'];if(p)return p;if(a.startsWith('LD')&&a.length>3)return assetUsd(a.slice(2));return null;}
@@ -677,15 +699,15 @@ window.oReview=async()=>{const sym=$('#oSym').value,side=$('#oSide').value,amt=+
     else{if(amt>100)throw new Error('Use um percentual de 1 a 100.');const q=floorStep(freeOf(sym)*amt/100,f('LOT_SIZE').stepSize||'0.00000001');
       if(!(+q>0))throw new Error(`Você não tem ${sym} livre suficiente na carteira Spot.`);if(+q*p<minN)throw new Error(`A venda ficaria abaixo do mínimo do par (${minN} USDT).`);
       ord={sym,side,params:{symbol:pair,side,type:'MARKET',quantity:q},usd:+q*p,desc:`VENDER ${q} ${sym} a mercado — cerca de ${(+q*p).toFixed(2)} USDT (≈ ${fm2(+q*p)})`};}
-    ordMsg='';}catch(e){ordMsg=errTxt(e);}renderAcct();};
+    ordMsg='';logEv('Ordens reais','Ordem revisada: '+ord.desc);}catch(e){ordMsg=errTxt(e);logEv('Ordens reais','Revisão recusada: '+ordMsg);}renderAcct();};
 window.oTest=async()=>{if(!ord)return;ordMsg='Testando na Binance (nada é executado)…';renderAcct();
-  try{await signed('order.test',ord.params);ord.tested=true;ordMsg='Teste aprovado pela Binance. Agora você pode confirmar a ordem real.';}catch(e){ord.tested=false;ordMsg='Teste recusado: '+errTxt(e);}renderAcct();};
+  try{await signed('order.test',ord.params);ord.tested=true;ordMsg='Teste aprovado pela Binance. Agora você pode confirmar a ordem real.';logEv('Ordens reais','Teste aprovado pela Binance: '+ord.desc);}catch(e){ord.tested=false;ordMsg='Teste recusado: '+errTxt(e);logEv('Ordens reais',ordMsg);}renderAcct();};
 window.oSend=async()=>{if(!ord?.tested||ord.sending)return;ord.sending=true;ordMsg='Enviando ordem real…';renderAcct();const o=ord;
   try{const r=await signed('order.place',{...o.params,newOrderRespType:'FULL'}),q=+r.executedQty,c=+r.cummulativeQuoteQty;
     realLog.push({t:Date.now(),sym:o.sym,side:o.side,q,c,px:q?c/q:null,id:r.orderId,st:r.status});if(realLog.length>200)realLog=realLog.slice(-200);db.set('reallog',realLog);
-    ord=null;ordMsg=`Ordem ${r.status==='FILLED'?'executada':r.status}: ${o.side==='BUY'?'comprou':'vendeu'} ${q} ${o.sym} por ${c.toFixed(2)} USDT.`;acctTs=0;loadAcct();}
-  catch(e){o.sending=false;o.tested=false;ordMsg='A ordem NÃO foi executada: '+errTxt(e);renderAcct();}};
-window.oCancel=()=>{ord=null;ordMsg='';renderAcct();};
+    ord=null;ordMsg=`Ordem ${r.status==='FILLED'?'executada':r.status}: ${o.side==='BUY'?'comprou':'vendeu'} ${q} ${o.sym} por ${c.toFixed(2)} USDT.`;logEv('Ordens reais','ORDEM REAL · '+ordMsg+` (nº ${r.orderId})`);acctTs=0;loadAcct();}
+  catch(e){o.sending=false;o.tested=false;ordMsg='A ordem NÃO foi executada: '+errTxt(e);logEv('Ordens reais',ordMsg);renderAcct();}};
+window.oCancel=()=>{if(ord)logEv('Ordens reais','Ordem cancelada antes do envio: '+ord.desc);ord=null;ordMsg='';renderAcct();};
 function renderAcct(){const el=$('#acct');if(!el)return;
   const mode=!vault?'new':!V?'locked':!V.k?'keys':'open';
   const key=[mode,V?.pub?1:0,acctTs,acctMsg,vMsg,vWipe,vBusy,keyAsk,ord?ord.desc+ord.tested+ord.sending:'',ordMsg,cur,realLog.length].join('|');
@@ -728,20 +750,20 @@ document.addEventListener('input',e=>{if(V&&e.target.closest&&e.target.closest('
 // ---- levar a carteira para outro aparelho ----
 const pack=()=>JSON.stringify({v:1,pf,tf,cur,sel,bot:{...bot,on:false}});
 function unpack(txt){try{let s=txt.trim();if(s[0]!=='{')s=decodeURIComponent(escape(atob(s)));const o=JSON.parse(s);if(!o.pf||!Array.isArray(o.pf.pos)||!Array.isArray(o.pf.closed))throw 0;
-  pf=o.pf;db.set('pf',pf);if(o.bot){bot=Object.assign(bot,o.bot,{on:false});db.set('bot',bot);}if(o.cur){cur=o.cur;db.set('cur',cur);$('#cur').value=cur;}if(o.sel){sel=o.sel;db.set('sel',sel);}$('#syncMsg').textContent='Carteira restaurada neste aparelho.';renderCarteira();}
+  pf=o.pf;db.set('pf',pf);if(o.bot){bot=Object.assign(bot,o.bot,{on:false});db.set('bot',bot);}if(o.cur){cur=o.cur;db.set('cur',cur);$('#cur').value=cur;}if(o.sel){sel=o.sel;db.set('sel',sel);}$('#syncMsg').textContent='Carteira restaurada neste aparelho.';logEv('Carteira','Carteira restaurada a partir de código ou arquivo');renderCarteira();}
   catch(e){$('#syncMsg').textContent='Código ou arquivo inválido.';}}
-$('#mkCode').onclick=async()=>{const code=btoa(unescape(encodeURIComponent(pack())));$('#syncTxt').value=code;let m='Código gerado. Copie e cole no outro aparelho.';
+$('#mkCode').onclick=async()=>{logEv('Carteira','Código de transferência da carteira gerado');const code=btoa(unescape(encodeURIComponent(pack())));$('#syncTxt').value=code;let m='Código gerado. Copie e cole no outro aparelho.';
   try{await navigator.clipboard.writeText(code);m='Código copiado. Cole no outro aparelho em “Restaurar”.';}catch(e){}$('#syncMsg').textContent=m;};
 $('#useCode').onclick=()=>unpack($('#syncTxt').value);
 $('#expFile').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([pack()],{type:'application/json'}));a.download='cripto-pro-carteira.json';a.click();};
 $('#impFile').onchange=e=>{const f=e.target.files[0];if(f)f.text().then(unpack);};
-$('#botBtn').onclick=()=>{bot.on=!bot.on;db.set('bot',bot);if(bot.on)botTick();renderBot();};
-$('#botFrac').onchange=e=>{fleetInit=false;bot.frac=+e.target.value;db.set('bot',bot);renderBot();};
-$('#botMax').onchange=e=>{fleetInit=false;bot.max=+e.target.value;db.set('bot',bot);renderBot();};
-$('#botClr').onclick=()=>{bot.log=[];db.set('bot',bot);renderBot();};
-$('#botTp').onchange=e=>{fleetInit=false;bot.tpM=+e.target.value;db.set('bot',bot);renderBot();};
-$('#botSl').onchange=e=>{fleetInit=false;bot.slM=+e.target.value;db.set('bot',bot);renderBot();};
-$('#botEntry').onchange=e=>{fleetInit=false;bot.entry=e.target.value;db.set('bot',bot);renderBot();};
+$('#botBtn').onclick=()=>{bot.on=!bot.on;logEv('Bot',bot.on?'Bot deste aparelho LIGADO · '+pTxt(presetOf()):'Bot deste aparelho DESLIGADO');db.set('bot',bot);if(bot.on)botTick();renderBot();};
+$('#botFrac').onchange=e=>{fleetInit=false;logEv('Ajustes','Bot: valor por operação alterado para '+e.target.selectedOptions[0].textContent);bot.frac=+e.target.value;db.set('bot',bot);renderBot();};
+$('#botMax').onchange=e=>{fleetInit=false;logEv('Ajustes','Bot: máx. de moedas alterado para '+e.target.selectedOptions[0].textContent);bot.max=+e.target.value;db.set('bot',bot);renderBot();};
+$('#botClr').onclick=()=>{logEv('Bot','Diário do bot limpo');bot.log=[];db.set('bot',bot);renderBot();};
+$('#botTp').onchange=e=>{fleetInit=false;logEv('Ajustes','Bot: alvo de lucro alterado para '+e.target.selectedOptions[0].textContent);bot.tpM=+e.target.value;db.set('bot',bot);renderBot();};
+$('#botSl').onchange=e=>{fleetInit=false;logEv('Ajustes','Bot: limite de perda alterado para '+e.target.selectedOptions[0].textContent);bot.slM=+e.target.value;db.set('bot',bot);renderBot();};
+$('#botEntry').onchange=e=>{fleetInit=false;logEv('Ajustes','Bot: entrada alterado para '+e.target.selectedOptions[0].textContent);bot.entry=e.target.value;db.set('bot',bot);renderBot();};
 // ---- Central de bots: presets, aparelhos registrados e acompanhamento ----
 const e64=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o)))),d64=s=>JSON.parse(decodeURIComponent(escape(atob(s))));
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -762,33 +784,36 @@ function renderFleet(){
   if(me.master)rows+=fleet.bots.map((b,i)=>{const r=b.rep;return `<tr><td><b>${esc(b.id)}</b> ${esc(b.name)}</td><td>${esc(b.dev)} ${r?(r.on?'<span class="sig BUY">LIGADO</span>':'<span class="sig WAIT">DESLIGADO</span>'):''}</td><td style="white-space:normal;min-width:200px">${pTxt(b.preset)}</td><td>${r?res(r.real+r.un,r.start):'<span class="mut">aguardando relatório</span>'}</td><td>${r?ops(r.n,r.wins)+` · ${r.open} aberta(s)`:'—'}</td><td>${r?dt(r.t,true):'—'}</td><td><button onclick="fleetKey(${i})">Chave</button> <button class="dan" onclick="fleetDel(${i})">${fleetAsk===i?'Confirmar':'Remover'}</button></td></tr>`;}).join('');
   $('#fleetBody').innerHTML=rows;}
 window.fleetKey=i=>{$('#fKey').value=keyOf(fleet.bots[i]);$('#fMsg').textContent=`Chave do ${fleet.bots[i].id} exibida abaixo.`;};
-window.fleetDel=i=>{if(fleetAsk!==i){fleetAsk=i;return renderFleet();}fleetAsk=-1;fleet.bots.splice(i,1);db.set('fleet',fleet);renderFleet();};
+window.fleetDel=i=>{if(fleetAsk!==i){fleetAsk=i;return renderFleet();}fleetAsk=-1;logEv('Central',`${fleet.bots[i].id} removido da Central`);fleet.bots.splice(i,1);db.set('fleet',fleet);renderFleet();};
 $('#fAdd').onclick=async()=>{const name=$('#fName').value.trim()||'Bot',d=$('#fDev').value.trim().toUpperCase();
   if(!/^AP-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(d))return $('#fMsg').textContent='ID do aparelho inválido. Copie-o da aba Bot do aparelho novo (formato AP-XXXX-XXXX).';
   if(d===dev.id)return $('#fMsg').textContent='Esse é o ID deste aparelho, que já é o '+me.id+'.';
   if(fleet.bots.some(b=>b.dev===d))return $('#fMsg').textContent='Esse aparelho já tem um bot registrado. Remova-o antes ou use “Chave”.';
   const b={id:'BOT'+String(fleet.next).padStart(2,'0'),name,dev:d,created:Date.now(),rep:null,preset:{frac:+$('#fFrac').value,max:+$('#fMax').value,tpM:+$('#fTp').value,slM:+$('#fSl').value,entry:$('#fEntry').value,tf}};
-  fleet.bots.push(b);fleet.next++;db.set('fleet',fleet);const k=keyOf(b);$('#fKey').value=k;$('#fName').value='';$('#fDev').value='';let m=`${b.id} criado. Cole a chave no aparelho ${d}.`;
+  fleet.bots.push(b);fleet.next++;db.set('fleet',fleet);logEv('Central',`${b.id} “${b.name}” criado para o aparelho ${b.dev} · ${pTxt(b.preset)}`);const k=keyOf(b);$('#fKey').value=k;$('#fName').value='';$('#fDev').value='';let m=`${b.id} criado. Cole a chave no aparelho ${d}.`;
   try{await navigator.clipboard.writeText(k);m=`${b.id} criado e chave copiada. Cole na aba Bot do aparelho ${d}.`;}catch(e){}$('#fMsg').textContent=m;renderFleet();};
 $('#fRepUse').onclick=()=>{try{const s=$('#fRep').value.trim();if(!s.startsWith('BOTREP1.'))throw 0;const r=d64(s.slice(8)),b=fleet.bots.find(x=>x.id===r.id&&x.dev===r.dev);
     if(!b)return $('#fRepMsg').textContent='Relatório de um bot que não está registrado nesta central.';if(!isFinite(r.real+r.un+r.n+r.wins+r.open+r.t))throw 0;
-    b.rep={t:r.t,real:r.real,un:r.un,n:r.n,wins:r.wins,open:r.open,start:r.start,on:!!r.on};db.set('fleet',fleet);$('#fRep').value='';$('#fRepMsg').textContent=`Resultado do ${b.id} atualizado.`;renderFleet();}
+    b.rep={t:r.t,real:r.real,un:r.un,n:r.n,wins:r.wins,open:r.open,start:r.start,on:!!r.on};db.set('fleet',fleet);$('#fRep').value='';$('#fRepMsg').textContent=`Resultado do ${b.id} atualizado.`;logEv('Central',`Relatório do ${b.id} recebido: resultado ${fm2(r.real+r.un)}, ${r.n} operação(ões)`);renderFleet();}
   catch(e){$('#fRepMsg').textContent='Relatório inválido.';}};
 $('#jUse').onclick=()=>{try{const s=$('#jKey').value.trim();if(!s.startsWith('BOTKEY1.'))throw 0;const o=d64(s.slice(8));if(!/^BOT\d{2,3}$/.test(o.id)||!okPreset(o.p))throw 0;
     if(o.dev!==dev.id)return $('#jMsg').textContent=`Esta chave foi gerada para o aparelho ${String(o.dev).slice(0,12)}. O ID deste aparelho é ${dev.id}.`;
     me={id:o.id,name:String(o.name||'Bot').slice(0,40),master:false,from:String(o.from||'').slice(0,12)};db.set('me',me);
     Object.assign(bot,{frac:o.p.frac,max:o.p.max,tpM:o.p.tpM,slM:o.p.slM,entry:o.p.entry,on:true,done:{}});db.set('bot',bot);$('#jKey').value='';
-    if(o.p.tf!==tf){tf=o.p.tf;db.set('tf',tf);$('#tf').value=tf;loadAll();}else{botTick();}renderBot();$('#sMsg').textContent=`${me.id} ativado e ligado com o preset recebido.`;}
+    if(o.p.tf!==tf){tf=o.p.tf;db.set('tf',tf);$('#tf').value=tf;loadAll();}else{botTick();}renderBot();$('#sMsg').textContent=`${me.id} ativado e ligado com o preset recebido.`;logEv('Central',`Aparelho ativado como ${me.id} pelo principal ${me.from} · ${pTxt(presetOf())}`);}
   catch(e){$('#jMsg').textContent='Chave de ativação inválida.';}};
-$('#sRep').onclick=async()=>{const s=botStats(),code='BOTREP1.'+e64({id:me.id,dev:dev.id,t:Date.now(),...s});$('#sTxt').value=code;let m='Relatório gerado. Copie e cole na Central do aparelho principal.';
+$('#sRep').onclick=async()=>{logEv('Central','Relatório gerado para o bot principal');const s=botStats(),code='BOTREP1.'+e64({id:me.id,dev:dev.id,t:Date.now(),...s});$('#sTxt').value=code;let m='Relatório gerado. Copie e cole na Central do aparelho principal.';
   try{await navigator.clipboard.writeText(code);m='Relatório copiado. Cole na Central de bots do aparelho principal.';}catch(e){}$('#sMsg').textContent=m;};
-let leaveAsk=false;$('#sLeave').onclick=()=>{if(!leaveAsk){leaveAsk=true;$('#sLeave').textContent='Confirmar: desvincular';return;}leaveAsk=false;$('#sLeave').textContent='Desvincular este aparelho';me={id:'BOT01',name:'Principal',master:true};db.set('me',me);bot.on=false;db.set('bot',bot);renderBot();};
+let leaveAsk=false;$('#sLeave').onclick=()=>{if(!leaveAsk){leaveAsk=true;$('#sLeave').textContent='Confirmar: desvincular';return;}leaveAsk=false;logEv('Central',`Aparelho desvinculado (era ${me.id})`);$('#sLeave').textContent='Desvincular este aparelho';me={id:'BOT01',name:'Principal',master:true};db.set('me',me);bot.on=false;db.set('bot',bot);renderBot();};
+$('#logQ').oninput=()=>renderLogs();
+$('#logExp').onclick=()=>{const txt=logs.map(x=>`${new Date(x.t).toLocaleString('pt-BR')}\t${x.c}\t${x.m}`).join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([`Cripto Pro ${APP_VERSION} — registro de atividades (${dev.id})\n`+txt],{type:'text/plain'}));a.download='cripto-pro-registro.txt';a.click();logEv('Sistema','Registro exportado para arquivo');};
+$('#logClr').onclick=()=>{if(!logAsk){logAsk=true;$('#logClr').textContent='Confirmar: limpar tudo';return;}logAsk=false;$('#logClr').textContent='Limpar registro';logs=[];db.set('log',logs);logEv('Sistema','Registro limpo pelo usuário');renderLogs();};
 // ---- PWA ----
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 let deferred;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('#inst').style.display='inline-block';});
 $('#inst').onclick=async()=>{if(!deferred)return;deferred.prompt();await deferred.userChoice;deferred=null;$('#inst').style.display='none';};
 let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(tab==='moeda')renderMoeda();},250);});
-loadAll();connectWS();loadFng();
+logEv('Sistema',`App aberto · versão ${APP_VERSION} · aparelho ${dev.id}`);loadAll();connectWS();loadFng();
 setInterval(loadAll,15*60*1000);
 </script>
 </body>

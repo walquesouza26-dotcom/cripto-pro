@@ -166,7 +166,7 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
     <div class="panel"><h2>Resultado realizado por semana</h2><div id="pfWeeks"></div></div>
     <div class="panel"><h2>Operações encerradas</h2><div class="tw"><table><thead><tr><th>Moeda</th><th>Entrada</th><th>Saída</th><th>Resultado</th></tr></thead><tbody id="pfClosed"></tbody></table></div></div>
   </div>
-  <div class="panel"><h2>Minha conta Binance <span class="val">só leitura</span></h2><div id="acct"></div></div>
+  <div class="panel"><h2>Área segura — conta Binance</h2><div id="acct"></div></div>
   <div class="panel"><h2>Usar em outro celular ou computador</h2>
     <p class="note">O histórico das moedas, os perfis e os sinais são recalculados sozinhos em qualquer aparelho. Só a sua carteira simulada precisa ser levada: gere o código aqui e restaure no outro aparelho.</p>
     <textarea id="syncTxt" placeholder="Cole aqui o código gerado no outro aparelho"></textarea>
@@ -192,6 +192,10 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
       <label class="note">Máx. de moedas ao mesmo tempo <select id="botMax"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option></select></label>
     </div>
   </div>
+  <div class="panel"><h2>Clonar bot para outro aparelho</h2>
+    <p class="note">Gere o código aqui e ative no outro celular ou computador: o bot liga lá com os mesmos ajustes e passa a rodar ao mesmo tempo, cada aparelho com a sua carteira simulada. O bot em segundo plano já aparece em todos os aparelhos sem precisar clonar.</p>
+    <textarea id="cloneTxt" placeholder="Cole aqui o código de clonagem gerado no outro aparelho"></textarea>
+    <div class="row" style="margin-top:8px"><button class="pri" id="cloneMk">Gerar código de clonagem</button><button id="cloneUse">Ativar bot clonado</button><span class="note" id="cloneMsg"></span></div></div>
   <div class="kpis" id="botK"></div>
   <div class="panel"><h2>Limites de decisão por moeda</h2>
     <div class="tw"><table><thead><tr><th>Moeda</th><th>Sinal</th><th>Vende com lucro de</th><th>Vende com perda de</th><th>Situação</th></tr></thead><tbody id="botLim"></tbody></table></div>
@@ -539,7 +543,7 @@ function renderCarteira(){
   $('#pfClosed').innerHTML=pf.closed.length?[...pf.closed].reverse().slice(0,30).map(x=>`<tr><td><b>${x.sym}</b></td><td>${dt(x.tin)}</td><td>${dt(x.tout)}</td><td class="${cl(x.pnl)}">${fm2(x.pnl)} (${pc(x.pnl/x.cost,2)})</td></tr>`).join(''):'<tr><td colspan="4" class="mut" style="text-align:center">Ainda sem operações encerradas.</td></tr>';
   const weeks=[];for(let w=7;w>=0;w--){const a=Date.now()-(w+1)*7*864e5,b=Date.now()-w*7*864e5;weeks.push({label:w?`−${w} sem`:'Atual',v:pf.closed.filter(x=>x.tout>a&&x.tout<=b).reduce((s,x)=>s+x.pnl,0)});}
   hbars($('#pfWeeks'),weeks,v=>fm2(v));
-  renderAcct();if(bk&&!acctBusy&&Date.now()-acctTs>60000)loadAcct();
+  renderAcct();
 }
 function renderBase(){
   const pr=db.get('perfis',null);$('#baseTs').textContent=pr?dt(pr.ts,true):'—';
@@ -570,48 +574,127 @@ $('#tf').onchange=e=>{tf=e.target.value;db.set('tf',tf);$('#prog').style.visibil
 $('#cur').onchange=e=>{cur=e.target.value;db.set('cur',cur);render();};
 $('#reload').onclick=()=>{$('#prog').style.visibility='visible';$('#prog i').style.width='0';loadAll();};
 $('#pfReset').onclick=()=>{bot.done={};db.set('bot',bot);let s=+$('#pfStart').value||1000;if(cur==='BRL')s/=(usdbrl||5);pf={cash:s,start:s,pos:[],closed:[]};db.set('pf',pf);renderCarteira();};
-// ---- conta Binance (só leitura, via WebSocket API assinada) ----
-let bk=db.get('bk',null),acct=null,acctTs=0,acctMsg='',acctBusy=false,allPx=null;
+// ---- ÁREA SEGURA: cofre com senha + conta Binance (WebSocket API assinada) ----
+let vault=db.get('vault',null),V=null,vKey=null,vAct=0,vMsg='',vWipe=false,vBusy=false,vFail=db.get('vfail',{n:0,until:0});
+let bk=db.get('bk',null),acct=null,acctTs=0,acctMsg='',acctBusy=false,allPx=null,ord=null,ordMsg='',realLog=db.get('reallog',[]),tOff=null,keyAsk=false;
 const STABLE={USDT:1,USDC:1,FDUSD:1,BUSD:1,TUSD:1,DAI:1};
-async function hmacHex(secret,msg){const e=new TextEncoder(),k=await crypto.subtle.importKey('raw',e.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
-  const s=await crypto.subtle.sign('HMAC',k,e.encode(msg));return [...new Uint8Array(s)].map(b=>b.toString(16).padStart(2,'0')).join('');}
+const enc=s=>new TextEncoder().encode(s),b64=u=>{let s='';new Uint8Array(u).forEach(b=>s+=String.fromCharCode(b));return btoa(s);},ub64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function vDerive(pw,salt){const km=await crypto.subtle.importKey('raw',enc(pw),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:600000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);}
+async function vSave(){const iv=crypto.getRandomValues(new Uint8Array(12)),ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},vKey,enc(JSON.stringify(V)));
+  vault={v:1,salt:vault.salt,iv:b64(iv),ct:b64(ct)};db.set('vault',vault);}
+const weakPw=p=>/^(\d)\1+$/.test(p)||'01234567890123456789'.includes(p)||'98765432109876543210'.includes(p);
+window.vCreate=async()=>{const a=$('#vP1').value,b=$('#vP2').value;
+  if(!window.crypto?.subtle){vMsg='Abra o app pelo endereço https para usar a área segura.';return renderAcct();}
+  if(!/^\d{10,}$/.test(a)){vMsg='A senha precisa ter pelo menos 10 dígitos (só números).';return renderAcct();}
+  if(weakPw(a)){vMsg='Senha fácil demais (sequência ou dígitos repetidos). Escolha outra.';return renderAcct();}
+  if(a!==b){vMsg='As duas senhas não conferem.';return renderAcct();}
+  vBusy=true;vMsg='Criando…';renderAcct();
+  try{const salt=crypto.getRandomValues(new Uint8Array(16));vKey=await vDerive(a,salt);V={};if(bk){V={type:'hmac',k:bk.k,s:bk.s};bk=null;try{localStorage.removeItem('cp_bk');}catch(e){}}
+    vault={salt:b64(salt)};await vSave();vAct=Date.now();vMsg='';}catch(e){V=null;vKey=null;vault=null;vMsg='Não foi possível criar: '+e.message;}
+  vBusy=false;renderAcct();if(V?.k)loadAcct();};
+window.vUnlock=async()=>{if(vBusy)return;const left=vFail.until-Date.now();if(left>0){vMsg=`Muitas tentativas. Aguarde ${Math.ceil(left/1000)} s.`;return renderAcct();}
+  const pw=$('#vP').value;vBusy=true;vMsg='Abrindo…';renderAcct();
+  try{vKey=await vDerive(pw,ub64(vault.salt));const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:ub64(vault.iv)},vKey,ub64(vault.ct));V=JSON.parse(new TextDecoder().decode(pt));
+    vFail={n:0,until:0};vAct=Date.now();vMsg='';}
+  catch(e){V=null;vKey=null;vFail.n++;if(vFail.n>=5)vFail.until=Date.now()+60000*(vFail.n-4);vMsg='Senha incorreta.'+(vFail.n>=5?` Bloqueado por ${vFail.n-4} min.`:'');}
+  db.set('vfail',vFail);vBusy=false;renderAcct();if(V?.k)loadAcct();};
+window.vLock=()=>{V=null;vKey=null;acct=null;ord=null;ordMsg='';acctMsg='';vMsg='';keyAsk=false;renderAcct();};
+window.vErase=()=>{if(!vWipe){vWipe=true;return renderAcct();}vWipe=false;vault=null;V=null;vKey=null;acct=null;ord=null;try{localStorage.removeItem('cp_vault');}catch(e){}vMsg='Área segura apagada deste aparelho.';renderAcct();};
+setInterval(()=>{if(V&&Date.now()-vAct>5*60000){vLock();vMsg='Bloqueada por inatividade.';renderAcct();}},15000);
+// chaves
+window.kGen=async()=>{try{const kp=await crypto.subtle.generateKey({name:'Ed25519'},true,['sign','verify']);
+    V.s=b64(await crypto.subtle.exportKey('pkcs8',kp.privateKey));const pub=b64(await crypto.subtle.exportKey('spki',kp.publicKey));
+    V.pub='-----BEGIN PUBLIC KEY-----\n'+pub.match(/.{1,64}/g).join('\n')+'\n-----END PUBLIC KEY-----';V.type='ed';V.k='';await vSave();acctMsg='';}
+  catch(e){acctMsg='Este navegador não gera esse tipo de chave. Atualize o Chrome/Safari ou use um computador.';}renderAcct();};
+window.kCopy=async()=>{try{await navigator.clipboard.writeText(V.pub);acctMsg='Chave pública copiada.';}catch(e){acctMsg='Selecione o texto e copie manualmente.';}renderAcct();};
+window.kSaveEd=async()=>{const k=$('#edK').value.trim();if(k.length<20){acctMsg='Cole a API Key que a Binance mostrou.';return renderAcct();}V.k=k;await vSave();acctTs=0;loadAcct();};
+window.kSaveH=async()=>{const k=$('#hK').value.trim(),s=$('#hS').value.trim();if(k.length<20||s.length<20){acctMsg='Cole as duas chaves completas.';return renderAcct();}V={type:'hmac',k,s};await vSave();acctTs=0;loadAcct();};
+window.kReset=async()=>{if(!keyAsk){keyAsk=true;return renderAcct();}keyAsk=false;V={};acct=null;ord=null;acctMsg='';await vSave();renderAcct();};
+async function hmacHex(secret,msg){const k=await crypto.subtle.importKey('raw',enc(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  return [...new Uint8Array(await crypto.subtle.sign('HMAC',k,enc(msg)))].map(b=>b.toString(16).padStart(2,'0')).join('');}
+async function signPayload(msg){if(V.type==='ed'){const k=await crypto.subtle.importKey('pkcs8',ub64(V.s),{name:'Ed25519'},false,['sign']);return b64(await crypto.subtle.sign({name:'Ed25519'},k,enc(msg)));}return hmacHex(V.s,msg);}
 function wsCall(method,params){return new Promise((res,rej)=>{let done=false;const w=new WebSocket('wss://ws-api.binance.com:443/ws-api/v3');
   const fin=(f,v)=>{if(done)return;done=true;clearTimeout(to);try{w.close();}catch(e){}f(v);};
   const to=setTimeout(()=>fin(rej,new Error('A Binance não respondeu. Tente de novo.')),15000);
   w.onopen=()=>w.send(JSON.stringify({id:'cp'+Date.now(),method,params}));
   w.onmessage=ev=>{let j;try{j=JSON.parse(ev.data);}catch(e){return;}if(j.status===200)fin(res,j.result);else fin(rej,Object.assign(new Error(j.error?.msg||('Erro '+j.status)),{code:j.error?.code}));};
   w.onerror=()=>fin(rej,new Error('Não foi possível conectar à Binance.'));});}
-async function loadAcct(){if(!bk||acctBusy)return;acctBusy=true;acctMsg='Consultando a Binance…';renderAcct();
-  try{if(!window.crypto?.subtle)throw new Error('Este navegador só permite a conexão quando o app é aberto pelo endereço https.');
-    let off=0;try{off=(await api('/api/v3/time')).serverTime-Date.now();}catch(e){}
-    const p={apiKey:bk.k,omitZeroBalances:true,recvWindow:10000,timestamp:Date.now()+off};
-    p.signature=await hmacHex(bk.s,Object.keys(p).sort().map(k=>k+'='+p[k]).join('&'));
-    acct=await wsCall('account.status',p);acctTs=Date.now();acctMsg='';
+async function signed(method,extra={}){if(!V?.k)throw new Error('Área segura bloqueada.');vAct=Date.now();
+  if(tOff==null){try{tOff=(await api('/api/v3/time')).serverTime-Date.now();}catch(e){tOff=0;}}
+  const p={apiKey:V.k,...extra,recvWindow:10000,timestamp:Date.now()+tOff};
+  p.signature=await signPayload(Object.keys(p).sort().map(k=>k+'='+p[k]).join('&'));return wsCall(method,p);}
+const ERR={'-2015':'A Binance recusou a chave: confira se ela está correta e ativa, e se tem a permissão necessária. Chaves comuns (HMAC) sem IP fixo só permitem leitura — para operar, use a “chave do app”.','-2014':'Formato da chave de API inválido.','-1022':'Assinatura recusada: a chave cadastrada na Binance não corresponde à deste aparelho.','-1021':'Relógio do aparelho fora de sincronia. Ajuste a hora automática e tente de novo.','-2010':'A Binance rejeitou a ordem (saldo insuficiente ou regra do par).','-1013':'Valor ou quantidade fora das regras do par (mínimo/máximo).'};
+const errTxt=e=>{if(e.code===-1021)tOff=null;return ERR[e.code]||e.message;};
+async function loadAcct(){if(!V?.k||acctBusy)return;acctBusy=true;acctMsg='Consultando a Binance…';renderAcct();
+  try{acct=await signed('account.status',{omitZeroBalances:true});acctTs=Date.now();acctMsg='';
     if(!allPx){allPx={};try{(await api('/api/v3/ticker/price')).forEach(x=>allPx[x.symbol]=+x.price);}catch(e){}}
-  }catch(e){acct=null;acctTs=Date.now();acctMsg=({'-2015':'A Binance recusou a chave: confira se copiou certo, se a leitura está habilitada e se não há restrição de IP.','-2014':'Formato da chave de API inválido.','-1022':'Assinatura recusada: confira a chave secreta.','-1021':'Relógio do aparelho fora de sincronia. Ajuste a hora automática e tente de novo.'})[e.code]||e.message;}
+  }catch(e){acct=null;acctTs=Date.now();acctMsg=errTxt(e);}
   acctBusy=false;renderAcct();}
+window.loadAcct=loadAcct;
 function assetUsd(a){if(STABLE[a])return 1;if(a==='BRL')return usdbrl?1/usdbrl:null;const p=price(a)??allPx?.[a+'USDT'];if(p)return p;if(a.startsWith('LD')&&a.length>3)return assetUsd(a.slice(2));return null;}
+const freeOf=a=>+(acct?.balances.find(b=>b.asset===a)?.free||0);
+// ordens reais (a mercado), sempre: revisar -> testar -> confirmar
+const floorStep=(q,step)=>{const d=(String(step).split('.')[1]||'').replace(/0+$/,'').length;return (Math.floor(q/ +step+1e-9)* +step).toFixed(d);};
+window.oSideCh=()=>{const buy=$('#oSide').value==='BUY';$('#oUnit').textContent=buy?'Valor em USDT':'% do saldo da moeda';$('#oAmt').value=buy?'10':'100';};
+let oF=null;
+window.oReview=async()=>{const sym=$('#oSym').value,side=$('#oSide').value,amt=+$('#oAmt').value;oF={sym,side,amt:$('#oAmt').value};const pair=sym+'USDT',p=price(sym);ord=null;
+  try{if(!(amt>0)||!p)throw new Error('Informe um valor válido.');
+    const info=(await api('/api/v3/exchangeInfo?symbol='+pair)).symbols[0],f=t=>info.filters.find(x=>x.filterType===t)||{};
+    const minN=+(f('NOTIONAL').minNotional||f('MIN_NOTIONAL').minNotional||5);
+    if(side==='BUY'){if(amt<minN)throw new Error(`O mínimo deste par é ${minN} USDT.`);if(amt>freeOf('USDT'))throw new Error(`Saldo insuficiente: você tem ${freeOf('USDT').toFixed(2)} USDT livres. As compras usam USDT.`);
+      ord={sym,side,params:{symbol:pair,side,type:'MARKET',quoteOrderQty:amt.toFixed(2)},usd:amt,desc:`COMPRAR ${sym} a mercado gastando ${amt.toFixed(2)} USDT (≈ ${fm2(amt)}) — cerca de ${(amt/p).toPrecision(5)} ${sym}`};}
+    else{if(amt>100)throw new Error('Use um percentual de 1 a 100.');const q=floorStep(freeOf(sym)*amt/100,f('LOT_SIZE').stepSize||'0.00000001');
+      if(!(+q>0))throw new Error(`Você não tem ${sym} livre suficiente na carteira Spot.`);if(+q*p<minN)throw new Error(`A venda ficaria abaixo do mínimo do par (${minN} USDT).`);
+      ord={sym,side,params:{symbol:pair,side,type:'MARKET',quantity:q},usd:+q*p,desc:`VENDER ${q} ${sym} a mercado — cerca de ${(+q*p).toFixed(2)} USDT (≈ ${fm2(+q*p)})`};}
+    ordMsg='';}catch(e){ordMsg=errTxt(e);}renderAcct();};
+window.oTest=async()=>{if(!ord)return;ordMsg='Testando na Binance (nada é executado)…';renderAcct();
+  try{await signed('order.test',ord.params);ord.tested=true;ordMsg='Teste aprovado pela Binance. Agora você pode confirmar a ordem real.';}catch(e){ord.tested=false;ordMsg='Teste recusado: '+errTxt(e);}renderAcct();};
+window.oSend=async()=>{if(!ord?.tested||ord.sending)return;ord.sending=true;ordMsg='Enviando ordem real…';renderAcct();const o=ord;
+  try{const r=await signed('order.place',{...o.params,newOrderRespType:'FULL'}),q=+r.executedQty,c=+r.cummulativeQuoteQty;
+    realLog.push({t:Date.now(),sym:o.sym,side:o.side,q,c,px:q?c/q:null,id:r.orderId,st:r.status});if(realLog.length>200)realLog=realLog.slice(-200);db.set('reallog',realLog);
+    ord=null;ordMsg=`Ordem ${r.status==='FILLED'?'executada':r.status}: ${o.side==='BUY'?'comprou':'vendeu'} ${q} ${o.sym} por ${c.toFixed(2)} USDT.`;acctTs=0;loadAcct();}
+  catch(e){o.sending=false;o.tested=false;ordMsg='A ordem NÃO foi executada: '+errTxt(e);renderAcct();}};
+window.oCancel=()=>{ord=null;ordMsg='';renderAcct();};
 function renderAcct(){const el=$('#acct');if(!el)return;
-  if(!bk){if($('#bkK')){$('#bkMsg').textContent=acctMsg;return;}el.innerHTML=`<p class="note">Mostra seus saldos reais ao lado dos sinais. O app <b>não envia ordens</b>: comprar e vender continua sendo feito por você, no app da Binance.</p>
-    <ol class="guide note"><li>Na Binance: Perfil → Gerenciamento de API → Criar API (gerada pelo sistema).</li><li>Deixe marcada <b>apenas “Habilitar leitura”</b>. Não habilite negociação nem saque.</li><li>Cole as duas chaves abaixo. Elas ficam guardadas só neste aparelho e não entram no código de transferência.</li></ol>
-    <input id="bkK" placeholder="Chave de API (API Key)" autocomplete="off" autocapitalize="off" spellcheck="false" style="width:100%;margin-bottom:8px">
-    <input id="bkS" type="password" placeholder="Chave secreta (Secret Key)" autocomplete="off" style="width:100%;margin-bottom:8px">
-    <div class="row"><button class="pri" onclick="bkSave()">Conectar</button><span class="note" id="bkMsg">${acctMsg}</span></div>`;return;}
+  const mode=!vault?'new':!V?'locked':!V.k?'keys':'open';
+  const key=[mode,V?.pub?1:0,acctTs,acctMsg,vMsg,vWipe,vBusy,keyAsk,ord?ord.desc+ord.tested+ord.sending:'',ordMsg,cur,realLog.length].join('|');
+  if(el.dataset.k===key)return;el.dataset.k=key;
+  if(mode==='new'){el.innerHTML=`<p class="note">Crie uma senha numérica de <b>10 dígitos ou mais</b>. Suas chaves da Binance ficam <b>criptografadas</b> neste aparelho e só abrem com ela. A área se bloqueia sozinha após 5 minutos sem uso. Se esquecer a senha, não há recuperação: é preciso apagar e cadastrar de novo.</p>
+    <input id="vP1" type="password" inputmode="numeric" autocomplete="new-password" placeholder="Senha (mínimo 10 dígitos)" style="width:100%;margin-bottom:8px">
+    <input id="vP2" type="password" inputmode="numeric" autocomplete="new-password" placeholder="Repita a senha" style="width:100%;margin-bottom:8px">
+    <div class="row"><button class="pri" onclick="vCreate()" ${vBusy?'disabled':''}>Criar área segura</button><span class="note">${vMsg}</span></div>${bk?'<p class="note">Sua chave de leitura já cadastrada será movida para dentro do cofre.</p>':''}`;return;}
+  if(mode==='locked'){el.innerHTML=`<p class="note">🔒 Área bloqueada. Digite sua senha para ver saldos e operar.</p>
+    <input id="vP" type="password" inputmode="numeric" autocomplete="current-password" placeholder="Senha de 10 dígitos" style="width:100%;margin-bottom:8px" onkeydown="if(event.key==='Enter')vUnlock()">
+    <div class="row"><button class="pri" onclick="vUnlock()" ${vBusy?'disabled':''}>Entrar</button><button class="dan" onclick="vErase()">${vWipe?'Confirmar: apagar tudo':'Esqueci a senha'}</button><span class="note">${vMsg}</span></div>`;return;}
+  const foot=`<div class="row" style="margin-top:10px"><button onclick="vLock()">🔒 Bloquear</button>${V.k?`<button onclick="loadAcct()">Atualizar saldos</button><button class="dan" onclick="kReset()">${keyAsk?'Confirmar: remover chave':'Trocar chave'}</button>`:''}<button class="dan" onclick="vErase()">${vWipe?'Confirmar: apagar tudo':'Apagar área segura'}</button></div><p class="note">${acctMsg||(acct?'Saldos atualizados às '+new Date(acctTs).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' · só carteira Spot':'')}</p>`;
+  if(mode==='keys'){el.innerHTML=`<h3>Opção 1 — Operar de verdade (chave do app)</h3>
+    <p class="note">A Binance só libera negociação sem IP fixo para chaves “autogeradas”. O app cria o par de chaves; a parte privada nunca sai deste aparelho.</p>`+
+    (V.pub?`<textarea readonly rows="4" onclick="this.select()">${V.pub}</textarea><div class="row" style="margin:8px 0"><button onclick="kCopy()">Copiar chave pública</button></div>
+      <ol class="guide note"><li>Na Binance (site): Perfil → Gerenciamento de API → Criar API → <b>Autogerada (Self-generated)</b>.</li><li>Cole a chave pública copiada.</li><li>Habilite <b>Leitura</b> e <b>Spot Trading</b>. <b>Nunca habilite saque.</b></li><li>Copie a “API Key” que a Binance mostrar e cole abaixo.</li></ol>
+      <input id="edK" placeholder="API Key mostrada pela Binance" autocomplete="off" autocapitalize="off" spellcheck="false" style="width:100%;margin-bottom:8px"><button class="pri" onclick="kSaveEd()">Salvar e conectar</button>`
+      :`<button class="pri" onclick="kGen()">Gerar chave do app</button>`)+
+    `<h3 style="margin-top:16px">Opção 2 — Só consultar saldos (chave comum)</h3>
+    <input id="hK" placeholder="API Key" autocomplete="off" autocapitalize="off" spellcheck="false" style="width:100%;margin-bottom:8px"><input id="hS" type="password" placeholder="Secret Key" autocomplete="off" style="width:100%;margin-bottom:8px"><button onclick="kSaveH()">Salvar chave de leitura</button>`+foot;return;}
   let html='';
   if(acct){const rows=acct.balances.map(b=>{const q=+b.free+ +b.locked,u=assetUsd(b.asset);return{a:b.asset,q,lock:+b.locked,v:u==null?null:q*u};}).filter(r=>r.q>0).sort((x,y)=>(y.v??-1)-(x.v??-1));
     const total=rows.reduce((s,r)=>s+(r.v||0),0),big=rows.filter(r=>r.v==null||r.v>=1),small=rows.length-big.length;
-    if(acct.canWithdraw||acct.canTrade)html+=`<div class="warnbox">Esta chave permite ${[acct.canTrade?'negociação':'',acct.canWithdraw?'saque':''].filter(Boolean).join(' e ')} na conta. O app só lê saldos, mas é mais seguro apagar essa chave na Binance e criar outra apenas com leitura.</div>`;
-    html+=`<div class="kpis"><div class="kpi"><div class="k">Saldo estimado (Spot)</div><div class="v">${fm2(total)}</div><div class="s">${rows.length} ativo(s)</div></div></div>
+    html+=`<div class="kpis"><div class="kpi"><div class="k">Saldo estimado (Spot)</div><div class="v">${fm2(total)}</div><div class="s">${rows.length} ativo(s)</div></div><div class="kpi"><div class="k">USDT livre para compras</div><div class="v">${freeOf('USDT').toFixed(2)}</div><div class="s">≈ ${fm2(freeOf('USDT'))}</div></div></div>
     <div class="tw"><table><thead><tr><th>Ativo</th><th>Quantidade</th><th>Valor</th><th>% da conta</th><th>Sinal</th></tr></thead><tbody>`+
     (big.length?big.map(r=>{const base=r.a.startsWith('LD')&&!price(r.a)?r.a.slice(2):r.a,a=A[base];
-      return `<tr ${a?`class="click" onclick="pick('${base}')"`:''}><td><b>${r.a}</b>${r.lock?' <span class="mut">(parte em ordem)</span>':''}</td><td>${r.q.toLocaleString('pt-BR',{maximumFractionDigits:8})}</td><td>${r.v==null?'<span class="mut">sem cotação</span>':fm2(r.v)}</td><td>${r.v==null||!total?'—':pcn(r.v/total)}</td><td>${a?sigBadge(a):'<span class="mut">—</span>'}</td></tr>`;}).join('')
+      return `<tr><td><b>${r.a}</b>${r.lock?' <span class="mut">(parte em ordem)</span>':''}</td><td>${r.q.toLocaleString('pt-BR',{maximumFractionDigits:8})}</td><td>${r.v==null?'<span class="mut">sem cotação</span>':fm2(r.v)}</td><td>${r.v==null||!total?'—':pcn(r.v/total)}</td><td>${a?sigBadge(a):'<span class="mut">—</span>'}</td></tr>`;}).join('')
       :'<tr><td colspan="5" class="mut" style="text-align:center">Nenhum saldo relevante na carteira Spot.</td></tr>')+
-    `</tbody></table></div>`+(small?`<p class="note">+ ${small} saldo(s) abaixo de US$ 1 não listado(s).</p>`:'');}
-  html+=`<div class="row" style="margin-top:8px"><button onclick="loadAcct()">Atualizar saldos</button><button class="dan" onclick="bkClear()">Desconectar e apagar chave</button><span class="note">${acctMsg||(acct?'Atualizado às '+new Date(acctTs).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' · só carteira Spot':'')}</span></div>`;
-  el.innerHTML=html;}
-window.loadAcct=loadAcct;
-window.bkSave=()=>{const k=$('#bkK').value.trim(),s=$('#bkS').value.trim();if(k.length<20||s.length<20){acctMsg='Cole as duas chaves completas.';renderAcct();return;}bk={k,s};db.set('bk',bk);acctTs=0;loadAcct();};
-window.bkClear=()=>{bk=null;acct=null;acctMsg='';try{localStorage.removeItem('cp_bk');}catch(e){}renderAcct();};
+    `</tbody></table></div>`+(small?`<p class="note">+ ${small} saldo(s) abaixo de US$ 1 não listado(s).</p>`:'');
+    html+=`<h3 style="margin-top:14px">Operação real ${V.type==='ed'?'':'<span class="val no">chave só de leitura</span>'}</h3>`;
+    if(ord)html+=`<div class="warnbox"><b>Revise:</b> ${ord.desc}.<br>Ordem a mercado: o preço final pode variar um pouco, e a Binance cobra a taxa dela. <b>Dinheiro real.</b>
+      <div class="row" style="margin-top:8px"><button onclick="oTest()">1. Testar sem executar</button><button class="pri" onclick="oSend()" ${ord.tested&&!ord.sending?'':'disabled style="opacity:.45"'}>2. Confirmar ordem REAL</button><button onclick="oCancel()">Cancelar</button></div></div>`;
+    else html+=`<div class="row"><select id="oSym">${COINS.map(c=>`<option ${c.sym===(oF?.sym||sel)?'selected':''}>${c.sym}</option>`).join('')}</select><select id="oSide" onchange="oSideCh()"><option value="BUY">Comprar</option><option value="SELL" ${oF?.side==='SELL'?'selected':''}>Vender</option></select>
+      <label class="note"><span id="oUnit">${oF?.side==='SELL'?'% do saldo da moeda':'Valor em USDT'}</span> <input id="oAmt" type="number" min="0" step="any" value="${oF?.amt||10}" style="width:100px"></label><button class="pri" onclick="oReview()">Revisar ordem</button></div>`;
+    html+=`<p class="note">${ordMsg}</p>`;
+    if(realLog.length)html+=`<h3>Ordens reais enviadas por este aparelho</h3><div class="tw"><table><thead><tr><th>Quando</th><th>Moeda</th><th>Lado</th><th>Quantidade</th><th>Total (USDT)</th><th>Preço médio</th></tr></thead><tbody>`+[...realLog].reverse().slice(0,20).map(x=>`<tr><td>${dt(x.t,true)}</td><td><b>${x.sym}</b></td><td><span class="sig ${x.side==='BUY'?'BUY':'SELL'}">${x.side==='BUY'?'COMPRA':'VENDA'}</span></td><td>${x.q}</td><td>${x.c.toFixed(2)}</td><td>${x.px?fm(x.px):'—'}</td></tr>`).join('')+'</tbody></table></div>';}
+  el.innerHTML=html+foot;}
+document.addEventListener('click',e=>{if(V&&e.target.closest&&e.target.closest('#acct'))vAct=Date.now();});
+document.addEventListener('input',e=>{if(V&&e.target.closest&&e.target.closest('#acct'))vAct=Date.now();});
 // ---- levar a carteira para outro aparelho ----
 const pack=()=>JSON.stringify({v:1,pf,tf,cur,sel,bot:{...bot,on:false}});
 function unpack(txt){try{let s=txt.trim();if(s[0]!=='{')s=decodeURIComponent(escape(atob(s)));const o=JSON.parse(s);if(!o.pf||!Array.isArray(o.pf.pos)||!Array.isArray(o.pf.closed))throw 0;
@@ -626,6 +709,12 @@ $('#botBtn').onclick=()=>{bot.on=!bot.on;db.set('bot',bot);if(bot.on)botTick();r
 $('#botFrac').onchange=e=>{bot.frac=+e.target.value;db.set('bot',bot);};
 $('#botMax').onchange=e=>{bot.max=+e.target.value;db.set('bot',bot);renderBot();};
 $('#botClr').onclick=()=>{bot.log=[];db.set('bot',bot);renderBot();};
+$('#cloneMk').onclick=async()=>{const code='BOT1.'+btoa(JSON.stringify({frac:bot.frac,max:bot.max,tf,cur}));$('#cloneTxt').value=code;let m='Código gerado. Copie e cole no outro aparelho.';
+  try{await navigator.clipboard.writeText(code);m='Código copiado. No outro aparelho: aba Bot → colar → “Ativar bot clonado”.';}catch(e){}$('#cloneMsg').textContent=m;};
+$('#cloneUse').onclick=()=>{try{const s=$('#cloneTxt').value.trim();if(!s.startsWith('BOT1.'))throw 0;const o=JSON.parse(atob(s.slice(5)));if(!(o.frac>0&&o.frac<=1)||!(o.max>=1&&o.max<=8))throw 0;
+    bot.frac=o.frac;bot.max=o.max;bot.on=true;bot.done={};db.set('bot',bot);if(o.cur==='BRL'||o.cur==='USD'){cur=o.cur;db.set('cur',cur);$('#cur').value=cur;}
+    $('#cloneMsg').textContent='Bot clonado e ligado neste aparelho.';if((o.tf==='1d'||o.tf==='4h')&&o.tf!==tf){tf=o.tf;db.set('tf',tf);$('#tf').value=tf;loadAll();}else{botTick();renderBot();}}
+  catch(e){$('#cloneMsg').textContent='Código de clonagem inválido.';}};
 // ---- PWA ----
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 let deferred;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('#inst').style.display='inline-block';});

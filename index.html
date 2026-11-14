@@ -188,18 +188,45 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
   <div class="panel">
     <div class="row" style="justify-content:space-between"><div><h2 style="margin:0">Bot neste aparelho <span class="sig WAIT" id="botState">DESLIGADO</span></h2><div class="note" id="botInfo"></div></div><button class="pri" id="botBtn">Ligar bot</button></div>
     <div class="row" style="margin-top:10px">
-      <label class="note">Valor por operação <select id="botFrac"><option value="0.1">10% da carteira</option><option value="0.2">20% da carteira</option><option value="0.25">25% da carteira</option><option value="0.33">33% da carteira</option><option value="0.5">50% da carteira</option></select></label>
-      <label class="note">Máx. de moedas ao mesmo tempo <select id="botMax"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option></select></label>
+      <label class="note">Valor por operação <select id="botFrac"><option value="0.1">10%</option><option value="0.2">20%</option><option value="0.25">25%</option><option value="0.33">33%</option><option value="0.5">50%</option></select></label>
+      <label class="note">Máx. de moedas <select id="botMax"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option></select></label>
+      <label class="note">Alvo de lucro <select id="botTp"><option value="0.5">metade da média (micro lucro)</option><option value="0.75">75% da média</option><option value="1">média histórica</option><option value="1.5">1,5× a média</option></select></label>
+      <label class="note">Limite de perda <select id="botSl"><option value="0.5">metade da média (bem curto)</option><option value="0.75">75% da média</option><option value="1">média histórica</option><option value="1.5">1,5× a média</option></select></label>
+      <label class="note">Entrada <select id="botEntry"><option value="ALL">gatilho novo ou regra ainda perto da entrada</option><option value="BUY">só gatilho novo de compra</option></select></label>
     </div>
   </div>
-  <div class="panel"><h2>Clonar bot para outro aparelho</h2>
-    <p class="note">Gere o código aqui e ative no outro celular ou computador: o bot liga lá com os mesmos ajustes e passa a rodar ao mesmo tempo, cada aparelho com a sua carteira simulada. O bot em segundo plano já aparece em todos os aparelhos sem precisar clonar.</p>
-    <textarea id="cloneTxt" placeholder="Cole aqui o código de clonagem gerado no outro aparelho"></textarea>
-    <div class="row" style="margin-top:8px"><button class="pri" id="cloneMk">Gerar código de clonagem</button><button id="cloneUse">Ativar bot clonado</button><span class="note" id="cloneMsg"></span></div></div>
+  <div class="panel"><h2>Central de bots</h2>
+    <div id="fleetHead" class="note"></div>
+    <div class="tw" style="margin-top:8px"><table><thead><tr><th>Bot</th><th>Onde roda</th><th>Preset</th><th>Resultado</th><th>Operações</th><th>Atualizado</th><th></th></tr></thead><tbody id="fleetBody"></tbody></table></div>
+    <div id="fleetMaster">
+      <h3 style="margin-top:14px">Adicionar bot em outro aparelho</h3>
+      <p class="note">No aparelho novo, abra o app → aba Bot e veja o “ID deste aparelho”. Digite esse ID aqui, ajuste o preset (já vem copiado deste bot) e gere a chave. A chave só funciona no aparelho com esse ID.</p>
+      <div class="row"><input id="fName" placeholder="Nome do bot (ex.: Celular da sala)" style="flex:1;min-width:180px"><input id="fDev" placeholder="ID do aparelho (AP-XXXX-XXXX)" autocapitalize="characters" style="flex:1;min-width:180px"></div>
+      <div class="row" style="margin-top:8px"><label class="note">Valor por operação <select id="fFrac"><option value="0.1">10%</option><option value="0.2">20%</option><option value="0.25">25%</option><option value="0.33">33%</option><option value="0.5">50%</option></select></label>
+      <label class="note">Máx. de moedas <select id="fMax"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option></select></label>
+      <label class="note">Alvo de lucro <select id="fTp"><option value="0.5">metade da média (micro lucro)</option><option value="0.75">75% da média</option><option value="1">média histórica</option><option value="1.5">1,5× a média</option></select></label>
+      <label class="note">Limite de perda <select id="fSl"><option value="0.5">metade da média (bem curto)</option><option value="0.75">75% da média</option><option value="1">média histórica</option><option value="1.5">1,5× a média</option></select></label>
+      <label class="note">Entrada <select id="fEntry"><option value="ALL">gatilho novo ou regra ainda perto da entrada</option><option value="BUY">só gatilho novo de compra</option></select></label></div>
+      <div class="row" style="margin-top:8px"><button class="pri" id="fAdd">Criar bot e gerar chave</button><span class="note" id="fMsg"></span></div>
+      <textarea id="fKey" readonly placeholder="A chave de ativação do bot aparece aqui" style="margin-top:8px" onclick="this.select()"></textarea>
+      <h3 style="margin-top:14px">Receber resultado de um bot</h3>
+      <textarea id="fRep" placeholder="Cole aqui o relatório gerado no outro aparelho"></textarea>
+      <div class="row" style="margin-top:8px"><button id="fRepUse">Atualizar acompanhamento</button><span class="note" id="fRepMsg"></span></div>
+    </div>
+    <div id="fleetJoin">
+      <h3 style="margin-top:14px">Este aparelho é um bot novo? Ative com a chave do bot principal</h3>
+      <textarea id="jKey" placeholder="Cole aqui a chave de ativação gerada no aparelho principal"></textarea>
+      <div class="row" style="margin-top:8px"><button id="jUse">Ativar este aparelho</button><span class="note" id="jMsg"></span></div>
+    </div>
+    <div id="fleetSlave">
+      <div class="row" style="margin-top:12px"><button class="pri" id="sRep">Gerar relatório para o bot principal</button><button class="dan" id="sLeave">Desvincular este aparelho</button><span class="note" id="sMsg"></span></div>
+      <textarea id="sTxt" readonly placeholder="O relatório aparece aqui" style="margin-top:8px" onclick="this.select()"></textarea>
+    </div>
+  </div>
   <div class="kpis" id="botK"></div>
   <div class="panel"><h2>Limites de decisão por moeda</h2>
     <div class="tw"><table><thead><tr><th>Moeda</th><th>Sinal</th><th>Vende com lucro de</th><th>Vende com perda de</th><th>Situação</th></tr></thead><tbody id="botLim"></tbody></table></div>
-    <p class="note">Os limites vêm do histórico de cada moeda: o <b>ganho médio</b> das operações vencedoras da regra escolhida vira o alvo de lucro, e a <b>perda média</b> das perdedoras vira o limite de perda. O bot compra em gatilho validado e vende no que acontecer primeiro: alvo de lucro, limite de perda ou saída da regra.</p></div>
+    <p class="note">Já com os multiplicadores do preset deste bot. Os limites vêm do histórico de cada moeda: o <b>ganho médio</b> das operações vencedoras da regra escolhida vira o alvo de lucro, e a <b>perda média</b> das perdedoras vira o limite de perda. O bot compra em gatilho validado e vende no que acontecer primeiro: alvo de lucro, limite de perda ou saída da regra.</p></div>
   <div class="panel"><h2>Diário de decisões do bot</h2><div class="tw"><table><thead><tr><th>Quando</th><th>Moeda</th><th>Ação</th><th>Preço</th><th>Resultado</th><th>Motivo</th></tr></thead><tbody id="botLog"></tbody></table></div>
     <div class="row" style="margin-top:8px"><button class="dan" id="botClr">Limpar diário</button></div></div>
 </section>
@@ -310,7 +337,9 @@ const db={get(k,def){try{const v=localStorage.getItem('cp_'+k);return v?JSON.par
 let tf=db.get('tf','1d'), cur=db.get('cur','BRL'), usdbrl=db.get('usdbrl',null);
 let K={}, A={}, P={}, live={}, sel=db.get('sel','BTC'), fng=null, tab='painel';
 let pf=db.get('pf',{cash:null,start:null,pos:[],closed:[]});
-let bot=Object.assign({on:false,frac:0.2,max:5,log:[],done:{},last:0},db.get('bot',{}));
+let bot=Object.assign({on:false,frac:0.2,max:5,tpM:1,slM:1,entry:'ALL',log:[],done:{},last:0},db.get('bot',{}));
+let dev=db.get('dev',null);if(!dev){const r=()=>Array.from(crypto.getRandomValues(new Uint8Array(4)),b=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b%32]).join('');dev={id:'AP-'+r()+'-'+r()};db.set('dev',dev);}
+let me=db.get('me',{id:'BOT01',name:'Principal',master:true}),fleet=db.get('fleet',{bots:[],next:2}),fleetAsk=-1;
 function sigHistory(){const out=[],step=tf==='1d'?864e5:144e5;
   for(const c of COINS){const a=A[c.sym],d=K[c.sym]?.d;if(!a)continue;
     for(const t of a.full.trades){out.push({t:d.t[t.i0]+step,sym:c.sym,sig:'BUY',p:d.c[t.i0],rule:a.best.s.name});if(!t.open)out.push({t:d.t[t.i1]+step,sym:c.sym,sig:'SELL',p:d.c[t.i1],rule:a.best.s.name,r:t.r});}}
@@ -491,7 +520,7 @@ window.pfSell=i=>{const x=pf.pos[i],t=closePos(i);if(t&&x.bot){botLog(x.sym,'VEN
 window.pfSellSym=sym=>{for(let i=pf.pos.length-1;i>=0;i--)if(pf.pos[i].sym===sym){const b=pf.pos[i].bot,t=closePos(i);if(t&&b)botLog(sym,'VENDA','Venda manual pelo usuário',t.pout,t.pnl/t.cost);}db.set('bot',bot);renderMoeda();};
 // ---- BOT (simulado): decide sozinho com limites tirados do histórico de cada moeda ----
 function botLim(sym){const a=A[sym],p=P[sym];if(!a||!p)return null;const cl=a.full.trades.filter(t=>!t.open),w=cl.filter(t=>t.r>0).map(t=>t.r),l=cl.filter(t=>t.r<=0).map(t=>-t.r);
-  const c=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));return{tp:c(w.length>=2?mean(w):p.vol,0.005,0.25),sl:c(l.length>=2?mean(l):p.vol,0.01,0.25),nw:w.length,nl:l.length};}
+  const c=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));return{tp:c((w.length>=2?mean(w):p.vol)*(bot.tpM||1),0.003,0.3),sl:c((l.length>=2?mean(l):p.vol)*(bot.slM||1),0.005,0.3),nw:w.length,nl:l.length};}
 function botLog(sym,act,why,p,r){bot.log.push({t:Date.now(),sym,act,why,p,r});if(bot.log.length>300)bot.log=bot.log.slice(-300);}
 function botTick(){if(!bot.on||!Object.keys(A).length)return;let ch=false;bot.last=Date.now();
   for(let i=pf.pos.length-1;i>=0;i--){const x=pf.pos[i];if(!x.bot)continue;const p=price(x.sym),a=A[x.sym];if(!p)continue;const r=x.qty*p*(1-FEE)/x.cost-1;
@@ -499,7 +528,7 @@ function botTick(){if(!bot.on||!Object.keys(A).length)return;let ch=false;bot.la
     if(why){const t=closePos(i);if(t){botLog(x.sym,'VENDA',why,t.pout,t.pnl/t.cost);ch=true;}}}
   const mine=()=>pf.pos.filter(x=>x.bot);
   const cand=COINS.map(c=>{const a=A[c.sym],d=K[c.sym]?.d,p=price(c.sym),lim=botLim(c.sym);if(!a||!d||!p||!lim||!a.valid)return null;
-      if(a.sig!=='BUY'&&!(a.sig==='HOLD'&&p<=d.c[a.k]*(1+lim.tp/2)))return null;
+      if(a.sig!=='BUY'&&!(bot.entry!=='BUY'&&a.sig==='HOLD'&&p<=d.c[a.k]*(1+lim.tp/2)))return null;
       if(bot.done[c.sym+tf]===d.t[a.k]||pf.pos.some(x=>x.sym===c.sym))return null;return{c,a,d,p,lim};}).filter(Boolean)
     .sort((x,y)=>(y.a.sig==='BUY')-(x.a.sig==='BUY')||y.a.week-x.a.week);
   for(const k of cand){if(mine().length>=bot.max)break;const amt=Math.min(pf.cash,pfValue()*bot.frac);if(amt<5)break;
@@ -522,7 +551,7 @@ function renderSrv(){
 function renderBot(){renderSrv();if(Date.now()-srvTs>120000)loadSrv();
   $('#botState').textContent=bot.on?'LIGADO':'DESLIGADO';$('#botState').className='sig '+(bot.on?'BUY':'WAIT');$('#botBtn').textContent=bot.on?'Desligar bot':'Ligar bot';$('#botBtn').className=bot.on?'dan':'pri';
   $('#botInfo').textContent=bot.on?`Monitorando ${COINS.length} moedas (${tf==='1d'?'diário':'4 horas'}) · última checagem ${bot.last?new Date(bot.last).toLocaleTimeString('pt-BR'):'—'}`:'Ligue para o bot comprar e vender sozinho na carteira simulada.';
-  $('#botFrac').value=String(bot.frac);$('#botMax').value=String(bot.max);
+  $('#botFrac').value=String(bot.frac);$('#botMax').value=String(bot.max);$('#botTp').value=String(bot.tpM);$('#botSl').value=String(bot.slM);$('#botEntry').value=bot.entry;renderFleet();
   const cl=pf.closed.filter(x=>x.bot),real=cl.reduce((s,x)=>s+x.pnl,0),open=pf.pos.filter(x=>x.bot),un=open.reduce((s,x)=>s+x.qty*(price(x.sym)||x.price)*(1-FEE)-x.cost,0),wins=cl.filter(x=>x.pnl>0).length;
   $('#botK').innerHTML=[['Resultado do bot',`<span class="${cl_(real+un)}">${fm2(real+un)}</span>`,`realizado ${fm2(real)}`],['Posições abertas',open.length+' de '+bot.max,`em aberto <span class="${cl_(un)}">${fm2(un)}</span>`],['Operações encerradas',cl.length,cl.length?`${wins} com lucro (${pcn(wins/cl.length)})`:'ainda nenhuma'],['Caixa disponível',fm2(pf.cash),'carteira simulada']]
     .map(k=>`<div class="kpi"><div class="k">${k[0]}</div><div class="v">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
@@ -706,15 +735,53 @@ $('#useCode').onclick=()=>unpack($('#syncTxt').value);
 $('#expFile').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([pack()],{type:'application/json'}));a.download='cripto-pro-carteira.json';a.click();};
 $('#impFile').onchange=e=>{const f=e.target.files[0];if(f)f.text().then(unpack);};
 $('#botBtn').onclick=()=>{bot.on=!bot.on;db.set('bot',bot);if(bot.on)botTick();renderBot();};
-$('#botFrac').onchange=e=>{bot.frac=+e.target.value;db.set('bot',bot);};
-$('#botMax').onchange=e=>{bot.max=+e.target.value;db.set('bot',bot);renderBot();};
+$('#botFrac').onchange=e=>{fleetInit=false;bot.frac=+e.target.value;db.set('bot',bot);renderBot();};
+$('#botMax').onchange=e=>{fleetInit=false;bot.max=+e.target.value;db.set('bot',bot);renderBot();};
 $('#botClr').onclick=()=>{bot.log=[];db.set('bot',bot);renderBot();};
-$('#cloneMk').onclick=async()=>{const code='BOT1.'+btoa(JSON.stringify({frac:bot.frac,max:bot.max,tf,cur}));$('#cloneTxt').value=code;let m='Código gerado. Copie e cole no outro aparelho.';
-  try{await navigator.clipboard.writeText(code);m='Código copiado. No outro aparelho: aba Bot → colar → “Ativar bot clonado”.';}catch(e){}$('#cloneMsg').textContent=m;};
-$('#cloneUse').onclick=()=>{try{const s=$('#cloneTxt').value.trim();if(!s.startsWith('BOT1.'))throw 0;const o=JSON.parse(atob(s.slice(5)));if(!(o.frac>0&&o.frac<=1)||!(o.max>=1&&o.max<=8))throw 0;
-    bot.frac=o.frac;bot.max=o.max;bot.on=true;bot.done={};db.set('bot',bot);if(o.cur==='BRL'||o.cur==='USD'){cur=o.cur;db.set('cur',cur);$('#cur').value=cur;}
-    $('#cloneMsg').textContent='Bot clonado e ligado neste aparelho.';if((o.tf==='1d'||o.tf==='4h')&&o.tf!==tf){tf=o.tf;db.set('tf',tf);$('#tf').value=tf;loadAll();}else{botTick();renderBot();}}
-  catch(e){$('#cloneMsg').textContent='Código de clonagem inválido.';}};
+$('#botTp').onchange=e=>{fleetInit=false;bot.tpM=+e.target.value;db.set('bot',bot);renderBot();};
+$('#botSl').onchange=e=>{fleetInit=false;bot.slM=+e.target.value;db.set('bot',bot);renderBot();};
+$('#botEntry').onchange=e=>{fleetInit=false;bot.entry=e.target.value;db.set('bot',bot);renderBot();};
+// ---- Central de bots: presets, aparelhos registrados e acompanhamento ----
+const e64=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o)))),d64=s=>JSON.parse(decodeURIComponent(escape(atob(s))));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pTxt=p=>`${Math.round(p.frac*100)}% por operação · máx. ${p.max} · alvo ×${String(p.tpM).replace('.',',')} · perda ×${String(p.slM).replace('.',',')} · ${p.entry==='BUY'?'só gatilho novo':'gatilho ou perto da entrada'} · ${p.tf==='4h'?'4 horas':'diário'}`;
+const presetOf=()=>({frac:bot.frac,max:bot.max,tpM:bot.tpM,slM:bot.slM,entry:bot.entry,tf});
+const okPreset=p=>p&&p.frac>0&&p.frac<=1&&p.max>=1&&p.max<=8&&p.tpM>0&&p.tpM<=3&&p.slM>0&&p.slM<=3&&(p.entry==='BUY'||p.entry==='ALL')&&(p.tf==='1d'||p.tf==='4h');
+function botStats(){const c=pf.closed.filter(x=>x.bot),o=pf.pos.filter(x=>x.bot);return{real:c.reduce((s,x)=>s+x.pnl,0),un:o.reduce((s,x)=>s+x.qty*(price(x.sym)||x.price)*(1-FEE)-x.cost,0),n:c.length,wins:c.filter(x=>x.pnl>0).length,open:o.length,start:pf.start,on:bot.on};}
+const keyOf=b=>'BOTKEY1.'+e64({id:b.id,name:b.name,dev:b.dev,p:b.preset,from:dev.id});
+let fleetInit=false;
+function renderFleet(){
+  $('#fleetHead').innerHTML=`Este aparelho: <b>${esc(me.id)}</b> · ${esc(me.name)} · ID deste aparelho: <b>${dev.id}</b>`+(me.master?'':` · controlado pelo aparelho principal ${esc(me.from||'')}`);
+  $('#fleetMaster').style.display=me.master?'':'none';$('#fleetSlave').style.display=me.master?'none':'';$('#fleetJoin').style.display=me.master&&!fleet.bots.length?'':'none';
+  if(!fleetInit){fleetInit=true;$('#fFrac').value=String(bot.frac);$('#fMax').value=String(bot.max);$('#fTp').value=String(bot.tpM);$('#fSl').value=String(bot.slM);$('#fEntry').value=bot.entry;}
+  const res=(v,start)=>`<span class="${cl_(v)}">${fm2(v)}</span>${start?` <span class="mut">(${pc(v/start,2)})</span>`:''}`,ops=(n,w)=>n?`${n} · ${pcn(w/n)} acerto`:'nenhuma';
+  const s=botStats();let rows=`<tr><td><b>${esc(me.id)}</b> ${esc(me.name)}</td><td>Este aparelho ${bot.on?'<span class="sig BUY">LIGADO</span>':'<span class="sig WAIT">DESLIGADO</span>'}</td><td style="white-space:normal;min-width:200px">${pTxt(presetOf())}</td><td>${res(s.real+s.un,s.start)}</td><td>${ops(s.n,s.wins)} · ${s.open} aberta(s)</td><td>agora</td><td></td></tr>`;
+  if(srv){const real=srv.closed.reduce((a,x)=>a+x.pnl,0),w=srv.closed.filter(x=>x.pnl>0).length,val=srv.value??srv.cash;
+    rows+=`<tr><td><b>BOT-BG</b> Segundo plano</td><td>Servidor (GitHub) ${srv.on?'<span class="sig BUY">LIGADO</span>':'<span class="sig WAIT">DESLIGADO</span>'}</td><td style="white-space:normal;min-width:200px">${srv.cfg?`${Math.round(srv.cfg.frac*100)}% por operação · máx. ${srv.cfg.max} · alvo ×1 · perda ×1 · diário`:'—'}</td><td>${res(val-srv.start,srv.start)}</td><td>${ops(srv.closed.length,w)} · ${srv.pos.length} aberta(s)</td><td>${dt(srv.updated,true)}</td><td></td></tr>`;}
+  if(me.master)rows+=fleet.bots.map((b,i)=>{const r=b.rep;return `<tr><td><b>${esc(b.id)}</b> ${esc(b.name)}</td><td>${esc(b.dev)} ${r?(r.on?'<span class="sig BUY">LIGADO</span>':'<span class="sig WAIT">DESLIGADO</span>'):''}</td><td style="white-space:normal;min-width:200px">${pTxt(b.preset)}</td><td>${r?res(r.real+r.un,r.start):'<span class="mut">aguardando relatório</span>'}</td><td>${r?ops(r.n,r.wins)+` · ${r.open} aberta(s)`:'—'}</td><td>${r?dt(r.t,true):'—'}</td><td><button onclick="fleetKey(${i})">Chave</button> <button class="dan" onclick="fleetDel(${i})">${fleetAsk===i?'Confirmar':'Remover'}</button></td></tr>`;}).join('');
+  $('#fleetBody').innerHTML=rows;}
+window.fleetKey=i=>{$('#fKey').value=keyOf(fleet.bots[i]);$('#fMsg').textContent=`Chave do ${fleet.bots[i].id} exibida abaixo.`;};
+window.fleetDel=i=>{if(fleetAsk!==i){fleetAsk=i;return renderFleet();}fleetAsk=-1;fleet.bots.splice(i,1);db.set('fleet',fleet);renderFleet();};
+$('#fAdd').onclick=async()=>{const name=$('#fName').value.trim()||'Bot',d=$('#fDev').value.trim().toUpperCase();
+  if(!/^AP-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(d))return $('#fMsg').textContent='ID do aparelho inválido. Copie-o da aba Bot do aparelho novo (formato AP-XXXX-XXXX).';
+  if(d===dev.id)return $('#fMsg').textContent='Esse é o ID deste aparelho, que já é o '+me.id+'.';
+  if(fleet.bots.some(b=>b.dev===d))return $('#fMsg').textContent='Esse aparelho já tem um bot registrado. Remova-o antes ou use “Chave”.';
+  const b={id:'BOT'+String(fleet.next).padStart(2,'0'),name,dev:d,created:Date.now(),rep:null,preset:{frac:+$('#fFrac').value,max:+$('#fMax').value,tpM:+$('#fTp').value,slM:+$('#fSl').value,entry:$('#fEntry').value,tf}};
+  fleet.bots.push(b);fleet.next++;db.set('fleet',fleet);const k=keyOf(b);$('#fKey').value=k;$('#fName').value='';$('#fDev').value='';let m=`${b.id} criado. Cole a chave no aparelho ${d}.`;
+  try{await navigator.clipboard.writeText(k);m=`${b.id} criado e chave copiada. Cole na aba Bot do aparelho ${d}.`;}catch(e){}$('#fMsg').textContent=m;renderFleet();};
+$('#fRepUse').onclick=()=>{try{const s=$('#fRep').value.trim();if(!s.startsWith('BOTREP1.'))throw 0;const r=d64(s.slice(8)),b=fleet.bots.find(x=>x.id===r.id&&x.dev===r.dev);
+    if(!b)return $('#fRepMsg').textContent='Relatório de um bot que não está registrado nesta central.';if(!isFinite(r.real+r.un+r.n+r.wins+r.open+r.t))throw 0;
+    b.rep={t:r.t,real:r.real,un:r.un,n:r.n,wins:r.wins,open:r.open,start:r.start,on:!!r.on};db.set('fleet',fleet);$('#fRep').value='';$('#fRepMsg').textContent=`Resultado do ${b.id} atualizado.`;renderFleet();}
+  catch(e){$('#fRepMsg').textContent='Relatório inválido.';}};
+$('#jUse').onclick=()=>{try{const s=$('#jKey').value.trim();if(!s.startsWith('BOTKEY1.'))throw 0;const o=d64(s.slice(8));if(!/^BOT\d{2,3}$/.test(o.id)||!okPreset(o.p))throw 0;
+    if(o.dev!==dev.id)return $('#jMsg').textContent=`Esta chave foi gerada para o aparelho ${String(o.dev).slice(0,12)}. O ID deste aparelho é ${dev.id}.`;
+    me={id:o.id,name:String(o.name||'Bot').slice(0,40),master:false,from:String(o.from||'').slice(0,12)};db.set('me',me);
+    Object.assign(bot,{frac:o.p.frac,max:o.p.max,tpM:o.p.tpM,slM:o.p.slM,entry:o.p.entry,on:true,done:{}});db.set('bot',bot);$('#jKey').value='';
+    if(o.p.tf!==tf){tf=o.p.tf;db.set('tf',tf);$('#tf').value=tf;loadAll();}else{botTick();}renderBot();$('#sMsg').textContent=`${me.id} ativado e ligado com o preset recebido.`;}
+  catch(e){$('#jMsg').textContent='Chave de ativação inválida.';}};
+$('#sRep').onclick=async()=>{const s=botStats(),code='BOTREP1.'+e64({id:me.id,dev:dev.id,t:Date.now(),...s});$('#sTxt').value=code;let m='Relatório gerado. Copie e cole na Central do aparelho principal.';
+  try{await navigator.clipboard.writeText(code);m='Relatório copiado. Cole na Central de bots do aparelho principal.';}catch(e){}$('#sMsg').textContent=m;};
+let leaveAsk=false;$('#sLeave').onclick=()=>{if(!leaveAsk){leaveAsk=true;$('#sLeave').textContent='Confirmar: desvincular';return;}leaveAsk=false;$('#sLeave').textContent='Desvincular este aparelho';me={id:'BOT01',name:'Principal',master:true};db.set('me',me);bot.on=false;db.set('bot',bot);renderBot();};
 // ---- PWA ----
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 let deferred;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('#inst').style.display='inline-block';});

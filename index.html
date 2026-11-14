@@ -177,8 +177,16 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
 
 <section class="tab" id="t-bot">
   <div class="warnbox"><b>Simulação.</b> O bot decide sozinho e opera na carteira simulada com os preços reais ao vivo, como se estivesse na sua conta — mas <b>nenhuma ordem real é enviada</b> à Binance. Ele trabalha enquanto o app está aberto.</div>
+  <div class="panel"><h2>Bot em segundo plano <span class="sig WAIT" id="srvState">—</span></h2>
+    <div class="note" id="srvInfo">Carregando…</div>
+    <div class="kpis" id="srvK" style="margin-top:10px"></div>
+    <h3>Posições do bot em segundo plano</h3>
+    <div class="tw"><table><thead><tr><th>Moeda</th><th>Compra</th><th>Preço na checagem</th><th>Resultado</th><th>Alvo / limite</th></tr></thead><tbody id="srvPos"></tbody></table></div>
+    <h3 style="margin-top:12px">Diário em segundo plano</h3>
+    <div class="tw"><table><thead><tr><th>Quando</th><th>Moeda</th><th>Ação</th><th>Preço</th><th>Resultado</th><th>Motivo</th></tr></thead><tbody id="srvLog"></tbody></table></div>
+    <p class="note">Roda sozinho nos servidores do GitHub a cada ~15 minutos, com o app fechado, usando velas diárias e uma carteira simulada própria (separada da carteira deste aparelho). Para ligar, desligar ou mudar os valores, edite o arquivo <b>bot/config.json</b> no repositório.</p></div>
   <div class="panel">
-    <div class="row" style="justify-content:space-between"><div><h2 style="margin:0">Bot automático <span class="sig WAIT" id="botState">DESLIGADO</span></h2><div class="note" id="botInfo"></div></div><button class="pri" id="botBtn">Ligar bot</button></div>
+    <div class="row" style="justify-content:space-between"><div><h2 style="margin:0">Bot neste aparelho <span class="sig WAIT" id="botState">DESLIGADO</span></h2><div class="note" id="botInfo"></div></div><button class="pri" id="botBtn">Ligar bot</button></div>
     <div class="row" style="margin-top:10px">
       <label class="note">Valor por operação <select id="botFrac"><option value="0.1">10% da carteira</option><option value="0.2">20% da carteira</option><option value="0.25">25% da carteira</option><option value="0.33">33% da carteira</option><option value="0.5">50% da carteira</option></select></label>
       <label class="note">Máx. de moedas ao mesmo tempo <select id="botMax"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option></select></label>
@@ -494,7 +502,20 @@ function botTick(){if(!bot.on||!Object.keys(A).length)return;let ch=false;bot.la
     pf.cash-=amt;pf.pos.push({sym:k.c.sym,qty:amt*(1-FEE)/k.p,price:k.p,cost:amt,t:Date.now(),bot:true,tp:k.lim.tp,sl:k.lim.sl});bot.done[k.c.sym+tf]=k.d.t[k.a.k];
     botLog(k.c.sym,'COMPRA',(k.a.sig==='BUY'?'Gatilho de compra validado':'Regra comprada e preço ainda perto da entrada')+` · ${k.a.best.s.name}`,k.p,null);ch=true;}
   if(ch){db.set('pf',pf);db.set('bot',bot);if(tab==='bot'||tab==='carteira'||tab==='moeda')render();}}
-function renderBot(){
+const SRV='https://raw.githubusercontent.com/walquesouza26-dotcom/cripto-pro/bot-data/state.json';let srv=null,srvTs=0,srvErr='';
+async function loadSrv(){srvTs=Date.now();try{const r=await fetch(SRV+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error(r.status);srv=await r.json();srvErr='';}catch(e){srvErr=srv?'':'Ainda sem dados: o bot em segundo plano não rodou a primeira vez (ou o agendamento está desativado no GitHub).';}if(tab==='bot')renderSrv();}
+function renderSrv(){
+  if(!srv){$('#srvState').textContent='—';$('#srvInfo').textContent=srvErr||'Carregando…';$('#srvK').innerHTML='';$('#srvPos').innerHTML='';$('#srvLog').innerHTML='';return;}
+  const age=(Date.now()-srv.updated)/6e4,stale=age>90;
+  $('#srvState').textContent=!srv.on?'DESLIGADO':stale?'ATRASADO':'LIGADO';$('#srvState').className='sig '+(!srv.on?'WAIT':stale?'WEAK':'BUY');
+  $('#srvInfo').textContent=`Última checagem: ${dt(srv.updated,true)} (há ${age<60?Math.round(age)+' min':Math.round(age/60)+' h'}) · ${srv.runs} checagens desde ${dt(srv.since)}`+(stale?' · o GitHub está atrasando ou pausou o agendamento':'');
+  const px=s=>srv.marks?.[s],real=srv.closed.reduce((s,x)=>s+x.pnl,0),wins=srv.closed.filter(x=>x.pnl>0).length,val=srv.value??srv.cash;
+  $('#srvK').innerHTML=[['Valor da carteira',fm2(val),`<span class="${cl_(val-srv.start)}">${pc(val/srv.start-1,2)}</span> desde o início`],['Realizado',`<span class="${cl_(real)}">${fm2(real)}</span>`,srv.closed.length?`${wins} de ${srv.closed.length} com lucro`:'nenhuma operação encerrada'],['Posições abertas',srv.pos.length+' de '+(srv.cfg?.max??'—'),'caixa '+fm2(srv.cash)]]
+    .map(k=>`<div class="kpi"><div class="k">${k[0]}</div><div class="v">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
+  $('#srvPos').innerHTML=srv.pos.length?srv.pos.map(x=>{const p=px(x.sym)||x.price,r=x.qty*p*(1-FEE)/x.cost-1;return `<tr class="click" onclick="pick('${x.sym}')"><td><b>${x.sym}</b> <span class="mut">${dt(x.t)}</span></td><td>${fm(x.price)}</td><td>${fm(p)}</td><td class="${cl_(r)}">${pc(r,2)}</td><td><span class="up">${pc(x.tp)}</span> / <span class="dn">−${pcn(x.sl,1)}</span></td></tr>`;}).join(''):'<tr><td colspan="5" class="mut" style="text-align:center">Nenhuma posição aberta.</td></tr>';
+  $('#srvLog').innerHTML=srv.log.length?[...srv.log].reverse().slice(0,40).map(x=>`<tr><td>${dt(x.t,true)}</td><td><b>${x.sym}</b></td><td><span class="sig ${x.act==='COMPRA'?'BUY':'SELL'}">${x.act}</span></td><td>${fm(x.p)}</td><td class="${cl_(x.r)}">${x.r==null?'—':pc(x.r,2)}</td><td style="white-space:normal;min-width:180px;text-align:left">${x.why}</td></tr>`).join(''):'<tr><td colspan="6" class="mut" style="text-align:center">Ainda sem decisões.</td></tr>';
+}
+function renderBot(){renderSrv();if(Date.now()-srvTs>120000)loadSrv();
   $('#botState').textContent=bot.on?'LIGADO':'DESLIGADO';$('#botState').className='sig '+(bot.on?'BUY':'WAIT');$('#botBtn').textContent=bot.on?'Desligar bot':'Ligar bot';$('#botBtn').className=bot.on?'dan':'pri';
   $('#botInfo').textContent=bot.on?`Monitorando ${COINS.length} moedas (${tf==='1d'?'diário':'4 horas'}) · última checagem ${bot.last?new Date(bot.last).toLocaleTimeString('pt-BR'):'—'}`:'Ligue para o bot comprar e vender sozinho na carteira simulada.';
   $('#botFrac').value=String(bot.frac);$('#botMax').value=String(bot.max);

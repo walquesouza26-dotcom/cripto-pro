@@ -1,0 +1,31 @@
+name: Bot simulado em segundo plano
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: bot
+  cancel-in-progress: false
+jobs:
+  rodar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Carrega o estado anterior
+        run: |
+          mkdir -p data
+          if git fetch --depth=1 origin bot-data 2>/dev/null; then git show FETCH_HEAD:state.json > data/state.json; fi
+      - name: Roda o bot (simulação, sem ordens reais)
+        run: node bot/run.mjs data/state.json
+      - name: Salva o estado
+        run: |
+          cd data
+          git init -q -b bot-data
+          git config user.name "cripto-pro-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add state.json
+          git commit -q -m "Estado do bot simulado"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" bot-data

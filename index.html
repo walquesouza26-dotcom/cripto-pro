@@ -128,6 +128,7 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
 
 <section class="tab on" id="t-painel">
   <div class="kpis" id="kpis"></div>
+  <div class="panel"><h2>Resumo ao vivo: o que está acontecendo agora</h2><div id="resumo" class="note" style="font-size:13px;color:var(--tx2)">Analisando…</div></div>
   <div class="panel"><h2>Oportunidades agora</h2><div class="opp" id="opp"><span class="note">Analisando histórico…</span></div></div>
   <div class="panel">
     <h2>Sinais por moeda</h2>
@@ -275,7 +276,7 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
 </div>
 
 <script>
-const APP_VERSION='1.1.0';document.getElementById('appVer').textContent=APP_VERSION;
+const APP_VERSION='1.2.0';document.getElementById('appVer').textContent=APP_VERSION;
 //<core>
 const COINS=[['BTC','Bitcoin'],['ETH','Ethereum'],['XRP','XRP'],['BNB','BNB'],['SOL','Solana'],['TRX','TRON'],['DOGE','Dogecoin'],['ADA','Cardano'],['LINK','Chainlink'],['LTC','Litecoin'],['AVAX','Avalanche'],['SUI','Sui'],['DOT','Polkadot'],['ZEC','Zcash'],['SHIB','Shiba Inu']].map(([sym,name])=>({sym,name,pair:sym+'USDT'}));
 const FEE=0.001, WARM=200, SPLIT=0.7;
@@ -408,7 +409,8 @@ function compute(){
   // grava perfis e mudanças de sinal na base
   const prof={};for(const s in P){const p=P[s];prof[s]={tendencia:p.trend,oscSemanal:p.vol,piorQueda:p.maxDD,quedaAtual:p.ddNow,corrBTC:p.corr,aposQueda:p.afterDrop,aposAlta:p.afterPump,melhorDia:DOW[p.bestDow],piorDia:DOW[p.worstDow],autocorr:p.ac,regra:A[s]?.best.s.name,validada:A[s]?.valid};}
   db.set('perfis',{ts:Date.now(),tf,perfis:prof});
-  if(pf.cash==null){const s=usdbrl?1000/usdbrl:200;pf={cash:s,start:s,pos:[],closed:[]};db.set('pf',pf);}
+  if(pf.cash==null){const s=usdbrl?1000/usdbrl:200;pf={cash:s,start:s,fx0:usdbrl,pos:[],closed:[]};db.set('pf',pf);}
+  if(pf.cash!=null&&!pf.fx0&&usdbrl){const g=1000/pf.start;pf.fx0=Math.abs(g/usdbrl-1)<0.08?g:usdbrl;db.set('pf',pf);}
   const ls=db.get('lastsig',{});for(const c of COINS){const a=A[c.sym];if(!a)continue;const k=c.sym+tf;if(ls[k]&&ls[k]!==a.sig)logEv('Sinais',`${c.sym}: sinal mudou de ${SIGL[ls[k]]} para ${SIGL[a.sig]} a ${fm(K[c.sym].last)} · regra ${a.best.s.name}${a.valid?' (validada)':' (não validada)'}`);ls[k]=a.sig;}db.set('lastsig',ls);
   botTick();render();
 }
@@ -460,6 +462,27 @@ function hbars(el,rows,fmt,signed=true){ // rows: [{label,v}]
 
 // ===================== RENDER =====================
 function sigBadge(a){return a?`<span class="sig ${a.sig}">${SIGL[a.sig]}</span>`:'<span class="mut">—</span>';}
+// separa o que veio das operações do que veio só da variação do dólar (a carteira simulada é guardada em dólar)
+function fxSplit(start,val,fx0){const ops=val-start;if(cur!=='BRL'||!usdbrl||!fx0)return{ops,fx:0,brl:false};return{ops:ops*usdbrl,fx:start*(usdbrl-fx0),brl:true};}
+const brl=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v),sgn=(v,f)=>`<span class="${cl(v)}">${v>=0?'+':''}${f(v)}</span>`;
+function splitTxt(start,val,fx0){const s=fxSplit(start,val,fx0);return s.brl?`operações ${sgn(s.ops,brl)} · dólar ${sgn(s.fx,brl)}`:`<span class="${cl(val-start)}">${pc(val/start-1,2)}</span> em operações`;}
+function ago(t){const m=(Date.now()-t)/6e4;return m<1?'agora há pouco':m<60?`há ${Math.round(m)} min`:m<2880?`há ${Math.round(m/60)} h`:`há ${Math.round(m/1440)} dias`;}
+function posLine(x,p){const r=x.qty*p*(1-FEE)/x.cost-1;return `<b>${x.sym}</b>: comprado a ${fm(x.price)} em ${dt(x.t)}; agora ${sgn(r,v=>pcn(v,2))}`+(x.tp?`. Vende sozinho com lucro de ${pc(x.tp)} (faltam ${pcn(Math.max(0,x.tp-r),1)}) ou com perda de −${pcn(x.sl,1)}`:'');}
+function renderResumo(){const el=$('#resumo');if(!el||!Object.keys(A).length)return;
+  const as=COINS.filter(c=>A[c.sym]),up=as.filter(c=>P[c.sym].trend==='Alta').length,down=as.filter(c=>P[c.sym].trend==='Baixa').length;
+  const buys=as.filter(c=>A[c.sym].valid&&(A[c.sym].sig==='BUY'||A[c.sym].sig==='HOLD')),sells=as.filter(c=>A[c.sym].sig==='SELL');
+  let li=[];
+  li.push(`<b>Mercado.</b> Das ${as.length} moedas, ${down} estão em tendência de baixa, ${up} em alta e ${as.length-up-down} de lado. `+(buys.length?`Com compra validada agora: ${buys.map(c=>c.sym).join(', ')}.`:'Nenhuma tem sinal de compra validado agora — por isso os bots não compram e ficam esperando.')+(sells.length?` Saída recente da regra em: ${sells.map(c=>c.sym).join(', ')}.`:''));
+  const mine=pf.pos.filter(x=>x.bot),man=pf.pos.filter(x=>!x.bot);
+  li.push(`<b>Bot deste aparelho (${me.id}).</b> `+(!bot.on?'Desligado: nada é comprado ou vendido sozinho neste aparelho.':mine.length?`Ligado, com ${mine.length} posição(ões) aberta(s):<br>`+mine.map(x=>posLine(x,price(x.sym)||x.price)).join('<br>'):'Ligado e parado, esperando um gatilho de compra validado. Ele confere os preços a cada 1,5 segundo enquanto o app está aberto.'));
+  if(man.length)li.push(`<b>Compras manuais simuladas.</b> `+man.map(x=>posLine(x,price(x.sym)||x.price)).join('<br>'));
+  if(srv){const hrs=(srv.updated-srv.since)/36e5,every=srv.runs>1?hrs/(srv.runs-1):null;
+    li.push(`<b>Bot em segundo plano.</b> ${srv.on?'Ligado':'Desligado'}; última checagem ${ago(srv.updated)}. `+(srv.pos.length?`${srv.pos.length} posição(ões):<br>`+srv.pos.map(x=>posLine(x,srv.marks?.[x.sym]||x.price)).join('<br>'):`Sem posições${srv.closed.length?'':' e sem nenhuma operação até hoje'}: está todo em caixa.`)+(every&&every>1?` Atenção: o GitHub tem rodado uma checagem a cada ${every.toFixed(1).replace('.',',')} h em média, e não a cada 15 minutos.`:''));}
+  const v=pfValue(),s=fxSplit(pf.start,v,pf.fx0);
+  li.push(`<b>Carteira simulada deste aparelho.</b> Vale ${fm2(v)}. `+(s.brl?`Desde o início: ${sgn(s.ops,brl)} vieram de operações e ${sgn(s.fx,brl)} vieram só da variação do dólar. O saldo simulado é guardado em dólar (USDT), como na Binance; quando o dólar sobe, o valor em reais sobe mesmo sem nenhuma compra ou venda.`:`Resultado das operações desde o início: ${sgn(v-pf.start,fm2)}.`));
+  const last=logs.filter(x=>x.c==='Bot'||x.c==='Sinais'||x.c==='Carteira'||x.c==='Ordens reais').slice(-3).reverse();
+  if(last.length)li.push(`<b>Últimos acontecimentos.</b><br>`+last.map(x=>`${dt(x.t,true)} — ${String(x.m).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}`).join('<br>'));
+  el.innerHTML=li.map(t=>`<p style="margin:0 0 9px">${t}</p>`).join('');}
 function renderKpis(){
   const as=COINS.map(c=>A[c.sym]).filter(Boolean);
   const buy=as.filter(a=>a.sig==='BUY').length,hold=as.filter(a=>a.sig==='HOLD').length,sell=as.filter(a=>a.sig==='SELL').length,val=as.filter(a=>a.valid).length;
@@ -476,7 +499,7 @@ function renderKpis(){
   ].map(k=>`<div class="kpi"><div class="k">${k[0]}</div><div class="v" style="${String(k[1]).length>12?'font-size:15px':''}">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
 }
 function renderPainel(){
-  renderKpis();
+  renderKpis();renderResumo();if(Date.now()-srvTs>120000)loadSrv();
   const acts=COINS.filter(c=>A[c.sym]&&(A[c.sym].sig==='BUY'||A[c.sym].sig==='SELL'));
   $('#opp').innerHTML=acts.length?acts.map(c=>{const a=A[c.sym];return `<div class="card" style="cursor:pointer" onclick="pick('${c.sym}')"><div class="row" style="justify-content:space-between"><b>${c.name}</b>${sigBadge(a)}</div><div class="s">${a.best.s.name} · há ${a.since} ${tf==='1d'?'dia(s)':'vela(s) de 4h'}</div><div class="s">Teste cego: <span class="${cl(a.best.oos.ret)}">${pc(a.best.oos.ret)}</span> · acerto ${pcn(a.best.oos.win)}</div></div>`;}).join('')
     :'<span class="note">Nenhum gatilho novo de compra ou venda agora. Em mercado sem sinal, ficar de fora também é uma decisão — a tabela abaixo mostra o que cada regra está esperando.</span>';
@@ -553,14 +576,14 @@ function botTick(){if(!bot.on||!Object.keys(A).length)return;let ch=false;bot.la
     botLog(k.c.sym,'COMPRA',(k.a.sig==='BUY'?'Gatilho de compra validado':'Regra comprada e preço ainda perto da entrada')+` · ${k.a.best.s.name}`,k.p,null);ch=true;}
   if(ch){db.set('pf',pf);db.set('bot',bot);if(tab==='bot'||tab==='carteira'||tab==='moeda')render();}}
 const SRV='https://raw.githubusercontent.com/walquesouza26-dotcom/cripto-pro/bot-data/state.json';let srv=null,srvTs=0,srvErr='';
-async function loadSrv(){srvTs=Date.now();try{const r=await fetch(SRV+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error(r.status);srv=await r.json();srvErr='';}catch(e){srvErr=srv?'':'Ainda sem dados: o bot em segundo plano não rodou a primeira vez (ou o agendamento está desativado no GitHub).';}if(tab==='bot')renderSrv();}
+async function loadSrv(){srvTs=Date.now();try{const r=await fetch(SRV+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error(r.status);srv=await r.json();srvErr='';}catch(e){srvErr=srv?'':'Ainda sem dados: o bot em segundo plano não rodou a primeira vez (ou o agendamento está desativado no GitHub).';}if(tab==='bot')renderSrv();if(tab==='painel')renderResumo();}
 function renderSrv(){
   if(!srv){$('#srvState').textContent='—';$('#srvInfo').textContent=srvErr||'Carregando…';$('#srvK').innerHTML='';$('#srvPos').innerHTML='';$('#srvLog').innerHTML='';return;}
   const age=(Date.now()-srv.updated)/6e4,stale=age>90;
   $('#srvState').textContent=!srv.on?'DESLIGADO':stale?'ATRASADO':'LIGADO';$('#srvState').className='sig '+(!srv.on?'WAIT':stale?'WEAK':'BUY');
   $('#srvInfo').textContent=`Última checagem: ${dt(srv.updated,true)} (há ${age<60?Math.round(age)+' min':Math.round(age/60)+' h'}) · ${srv.runs} checagens desde ${dt(srv.since)}`+(stale?' · o GitHub está atrasando ou pausou o agendamento':'');
   const px=s=>srv.marks?.[s],real=srv.closed.reduce((s,x)=>s+x.pnl,0),wins=srv.closed.filter(x=>x.pnl>0).length,val=srv.value??srv.cash;
-  $('#srvK').innerHTML=[['Valor da carteira',fm2(val),`<span class="${cl_(val-srv.start)}">${pc(val/srv.start-1,2)}</span> desde o início`],['Realizado',`<span class="${cl_(real)}">${fm2(real)}</span>`,srv.closed.length?`${wins} de ${srv.closed.length} com lucro`:'nenhuma operação encerrada'],['Posições abertas',srv.pos.length+' de '+(srv.cfg?.max??'—'),'caixa '+fm2(srv.cash)]]
+  $('#srvK').innerHTML=[['Valor da carteira',fm2(val),splitTxt(srv.start,val,srv.fx0)],['Realizado',`<span class="${cl_(real)}">${fm2(real)}</span>`,srv.closed.length?`${wins} de ${srv.closed.length} com lucro`:'nenhuma operação encerrada'],['Posições abertas',srv.pos.length+' de '+(srv.cfg?.max??'—'),'caixa '+fm2(srv.cash)]]
     .map(k=>`<div class="kpi"><div class="k">${k[0]}</div><div class="v">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
   $('#srvPos').innerHTML=srv.pos.length?srv.pos.map(x=>{const p=px(x.sym)||x.price,r=x.qty*p*(1-FEE)/x.cost-1;return `<tr class="click" onclick="pick('${x.sym}')"><td><b>${x.sym}</b> <span class="mut">${dt(x.t)}</span></td><td>${fm(x.price)}</td><td>${fm(p)}</td><td class="${cl_(r)}">${pc(r,2)}</td><td><span class="up">${pc(x.tp)}</span> / <span class="dn">−${pcn(x.sl,1)}</span></td></tr>`;}).join(''):'<tr><td colspan="5" class="mut" style="text-align:center">Nenhuma posição aberta.</td></tr>';
   $('#srvLog').innerHTML=srv.log.length?[...srv.log].reverse().slice(0,40).map(x=>`<tr><td>${dt(x.t,true)}</td><td><b>${x.sym}</b></td><td><span class="sig ${x.act==='COMPRA'?'BUY':'SELL'}">${x.act}</span></td><td>${fm(x.p)}</td><td class="${cl_(x.r)}">${x.r==null?'—':pc(x.r,2)}</td><td style="white-space:normal;min-width:180px;text-align:left">${x.why}</td></tr>`).join(''):'<tr><td colspan="6" class="mut" style="text-align:center">Ainda sem decisões.</td></tr>';
@@ -581,7 +604,7 @@ function renderBot(){renderSrv();if(Date.now()-srvTs>120000)loadSrv();
 }
 function renderCarteira(){
   const v=pfValue(),real=pf.closed.reduce((s,x)=>s+x.pnl,0),wk=pf.closed.filter(x=>x.tout>Date.now()-7*864e5).reduce((s,x)=>s+x.pnl,0),wins=pf.closed.filter(x=>x.pnl>0).length;
-  $('#pfK').innerHTML=[['Valor total',fm2(v),`<span class="${cl(v-pf.start)}">${pc(v/pf.start-1,2)}</span>`],['Em caixa',fm2(pf.cash),''],['Realizado (7 dias)',`<span class="${cl(wk)}">${fm2(wk)}</span>`,''],['Realizado (total)',`<span class="${cl(real)}">${fm2(real)}</span>`,pf.closed.length?`${wins} de ${pf.closed.length} com lucro`:'']]
+  $('#pfK').innerHTML=[['Valor total',fm2(v),splitTxt(pf.start,v,pf.fx0)],['Em caixa',fm2(pf.cash),''],['Realizado (7 dias)',`<span class="${cl(wk)}">${fm2(wk)}</span>`,''],['Realizado (total)',`<span class="${cl(real)}">${fm2(real)}</span>`,pf.closed.length?`${wins} de ${pf.closed.length} com lucro`:'']]
     .map(k=>`<div class="kpi"><div class="k">${k[0]}</div><div class="v">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
   $('#pfPos').innerHTML=pf.pos.length?pf.pos.map((x,i)=>{const p=price(x.sym)||x.price,val=x.qty*p,r=val*(1-FEE)/x.cost-1;
     return `<tr><td><b>${x.sym}</b> ${x.bot?'<span class="val">bot</span> ':''}<span class="mut">${dt(x.t)}</span></td><td>${fm(x.price)}</td><td>${fm(p)}</td><td>${fm2(val)}</td><td class="${cl(r)}">${pc(r,2)}</td><td>${sigBadge(A[x.sym])}</td><td><button onclick="pfSell(${i})">Vender</button></td></tr>`;}).join('')
@@ -611,7 +634,7 @@ function render(){({painel:renderPainel,moeda:renderMoeda,carteira:renderCarteir
 function liveUpdate(){
   if(tab==='painel'){for(const c of COINS){const l=live[c.sym];if(!l)continue;const t=fm(l.p);
       document.querySelectorAll(`[data-px="${c.sym}"]`).forEach(e=>{if(e.textContent!==t){e.textContent=t;e.classList.remove('flash');void e.offsetWidth;e.classList.add('flash');}});
-      document.querySelectorAll(`[data-ch="${c.sym}"]`).forEach(h=>{h.textContent=pc(l.ch,2);h.className=cl(l.ch);});}renderKpis();}
+      document.querySelectorAll(`[data-ch="${c.sym}"]`).forEach(h=>{h.textContent=pc(l.ch,2);h.className=cl(l.ch);});}renderKpis();renderResumo();}
   else if(tab==='moeda'){const e=$('#heroP');if(e)e.textContent=fm(price(sel));}
   else if(tab==='carteira')renderCarteira();
   else if(tab==='bot')renderBot();
@@ -625,7 +648,7 @@ $('#tf').value=tf;$('#cur').value=cur;
 $('#tf').onchange=e=>{tf=e.target.value;logEv('Ajustes','Período de análise alterado para '+(tf==='1d'?'diário':'4 horas'));db.set('tf',tf);$('#prog').style.visibility='visible';$('#prog i').style.width='0';loadAll();};
 $('#cur').onchange=e=>{cur=e.target.value;logEv('Ajustes','Moeda de exibição alterada para '+cur);db.set('cur',cur);render();};
 $('#reload').onclick=()=>{$('#prog').style.visibility='visible';$('#prog i').style.width='0';loadAll();};
-$('#pfReset').onclick=()=>{logEv('Carteira','Carteira simulada reiniciada');bot.done={};db.set('bot',bot);let s=+$('#pfStart').value||1000;if(cur==='BRL')s/=(usdbrl||5);pf={cash:s,start:s,pos:[],closed:[]};db.set('pf',pf);renderCarteira();};
+$('#pfReset').onclick=()=>{logEv('Carteira','Carteira simulada reiniciada');bot.done={};db.set('bot',bot);let s=+$('#pfStart').value||1000;if(cur==='BRL')s/=(usdbrl||5);pf={cash:s,start:s,fx0:usdbrl,pos:[],closed:[]};db.set('pf',pf);renderCarteira();};
 // ---- ÁREA SEGURA: cofre com senha + conta Binance (WebSocket API assinada) ----
 let vault=db.get('vault',null),V=null,vKey=null,vAct=0,vMsg='',vWipe=false,vBusy=false,vFail=db.get('vfail',{n:0,until:0});
 let bk=db.get('bk',null),acct=null,acctTs=0,acctMsg='',acctBusy=false,allPx=null,ord=null,ordMsg='',realLog=db.get('reallog',[]),tOff=null,keyAsk=false;

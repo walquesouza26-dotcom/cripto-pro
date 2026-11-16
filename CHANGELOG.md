@@ -2,6 +2,11 @@
 
 Formato: MAIOR.MENOR.CORREÇÃO — MAIOR em reformulações grandes, MENOR quando entra função nova, CORREÇÃO em ajustes.
 
+## 1.2.0 — 2026-11-16
+- Novo quadro “Resumo ao vivo” no Painel: explica em frases o que o mercado, cada bot e a carteira estão fazendo agora
+- Carteiras simuladas passam a separar o resultado das operações do efeito da variação do dólar (o saldo é guardado em dólar)
+- Aviso quando o GitHub roda o bot em segundo plano com intervalo maior que o previsto
+
 ## 1.1.0 — 2026-11-13
 - Nova aba Logs: registro de tudo o que acontece no aparelho (sistema, sinais, carteira, bot, área segura, ordens reais, central e ajustes), com filtro, busca, exportação e limpeza
 

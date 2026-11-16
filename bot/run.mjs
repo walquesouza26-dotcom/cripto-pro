@@ -35,7 +35,8 @@ if (!Object.keys(K).length) { console.error('Sem dados da Binance; estado mantid
 let usdbrl = st?.usdbrl || 5.5;
 try { usdbrl = +(await api('/api/v3/ticker/price?symbol=USDTBRL')).price; } catch (e) {}
 
-if (!st || !Array.isArray(st.pos)) { const s = cfg.capitalInicialBRL / usdbrl; st = { cash: s, start: s, pos: [], closed: [], log: [], done: {}, runs: 0, since: now }; }
+if (!st || !Array.isArray(st.pos)) { const s = cfg.capitalInicialBRL / usdbrl; st = { cash: s, start: s, fx0: usdbrl, pos: [], closed: [], log: [], done: {}, runs: 0, since: now }; }
+if (!st.fx0) st.fx0 = cfg.capitalInicialBRL / st.start; // câmbio do dia em que a carteira começou
 const price = s => K[s]?.last;
 const log = (sym, act, why, p, r) => { st.log.push({ t: now, sym, act, why, p, r }); if (st.log.length > 300) st.log = st.log.slice(-300); };
 const A = {}, L = {};

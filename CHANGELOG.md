@@ -2,6 +2,11 @@
 
 Formato: MAIOR.MENOR.CORREÇÃO — MAIOR em reformulações grandes, MENOR quando entra função nova, CORREÇÃO em ajustes.
 
+## 1.3.0 — 2026-11-16
+- Bots autônomos em segundo plano: agora são vários (BG01 Conservador, BG02 Micro lucro, BG03 Paciente), cada um com preset e carteira simulada próprios, inclusive no período de 4 horas
+- Aba Bot, Central de bots e Resumo ao vivo mostram todos eles lado a lado, sem precisar colar relatório
+- Agendamento do GitHub movido para minutos menos concorridos (7, 22, 37 e 52 de cada hora)
+
 ## 1.2.0 — 2026-11-16
 - Novo quadro “Resumo ao vivo” no Painel: explica em frases o que o mercado, cada bot e a carteira estão fazendo agora
 - Carteiras simuladas passam a separar o resultado das operações do efeito da variação do dólar (o saldo é guardado em dólar)

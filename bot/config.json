@@ -1,6 +1,8 @@
 {
-  "ligado": true,
-  "percentualPorOperacao": 20,
-  "maximoDeMoedas": 5,
-  "capitalInicialBRL": 1000
+  "capitalInicialBRL": 1000,
+  "bots": [
+    { "id": "BG01", "nome": "Conservador", "ligado": true, "periodo": "1d", "percentualPorOperacao": 20, "maximoDeMoedas": 5, "alvo": 1, "perda": 0.75, "entrada": "gatilho" },
+    { "id": "BG02", "nome": "Micro lucro", "ligado": true, "periodo": "4h", "percentualPorOperacao": 20, "maximoDeMoedas": 5, "alvo": 0.5, "perda": 0.5, "entrada": "ampla" },
+    { "id": "BG03", "nome": "Paciente", "ligado": true, "periodo": "1d", "percentualPorOperacao": 20, "maximoDeMoedas": 5, "alvo": 1.5, "perda": 1, "entrada": "ampla" }
+  ]
 }

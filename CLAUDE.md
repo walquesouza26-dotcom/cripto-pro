@@ -8,6 +8,7 @@ A cada mudança que altere o comportamento ou a interface do app:
 
 Outras regras:
 - O motor de análise fica entre `//<core>` e `//</core>` em `index.html`; `bot/run.mjs` lê esse trecho, então mantenha-o sem dependência de DOM.
+- `bot/config.json` lista os bots em segundo plano (ids `BG01`…`BG08`); cada um tem carteira simulada própria no ramo `bot-data` (`state.json`, formato v2). Retirar um bot do config só o desliga; o histórico fica guardado.
 - Os bots são sempre simulados. Ordens reais só pelo fluxo manual da área segura (revisar → testar → confirmar).
 - Nunca gravar chaves, senhas ou tokens no repositório (ele é público).
 - Textos do app e do manual em português do Brasil, para usuário leigo.

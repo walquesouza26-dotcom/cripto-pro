@@ -107,6 +107,42 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
   .hero .p{font-size:24px}
   th,td{padding:8px 6px}
 }
+.grp{text-align:left!important;color:var(--tx2);font-weight:600;font-size:12px;background:var(--s2);padding:7px 8px}
+.chipsep{font-size:11px;color:var(--mut);align-self:center;padding:0 2px 0 8px;white-space:nowrap}
+.chip.alt{border-style:dashed}
+
+/* ---- 1.7.0: layout ---- */
+header{position:sticky;top:0;z-index:15;background:var(--bg);padding:8px 0;margin-bottom:6px;border-bottom:1px solid var(--line)}
+h1{display:flex;align-items:center;gap:8px}
+h1:before{content:"";width:26px;height:26px;border-radius:7px;flex:none;background:linear-gradient(135deg,var(--c1),var(--c3))}
+.panel h2{font-size:15px;letter-spacing:.1px}
+.panel h3{margin-top:4px}
+th:nth-child(-n+2),td:nth-child(-n+2){text-align:left}
+.seg{display:flex;gap:4px;background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:12px;overflow-x:auto}
+.seg button{flex:1;border:0;background:none;color:var(--mut);padding:9px 10px;border-radius:9px;white-space:nowrap;font-weight:600}
+.seg button.on{background:var(--c1);color:#fff}
+.sub{display:none}.sub.on{display:block}
+.mkt{margin-top:10px;padding:9px 11px;border-radius:10px;background:var(--s2);font-size:13px;color:var(--tx2);line-height:1.5}
+#tioBox .card{margin-bottom:12px;border-color:#5d4a16;background:linear-gradient(180deg,#2a2210,var(--s2))}
+.botgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-bottom:12px}
+.bcard{background:var(--s1);border:1px solid var(--line);border-radius:12px;padding:11px 12px}
+.bhead{display:flex;align-items:center;gap:8px}
+.rank{font-size:12px;color:var(--mut);font-variant-numeric:tabular-nums;min-width:22px}
+.bname{color:var(--tx2)}
+.bres{font-size:20px;font-weight:700;margin:6px 0 4px;font-variant-numeric:tabular-nums}
+.bres small{font-size:12px;font-weight:500;color:var(--mut)}
+.bline{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--tx2);padding:2px 0}
+.bpreset{font-size:11px;color:var(--mut);margin-top:6px;padding-top:6px;border-top:1px solid var(--line);line-height:1.45}
+details.panel>summary{cursor:pointer;color:var(--tx2);font-weight:600}
+details.panel[open]>summary{margin-bottom:10px}
+#resumo a{color:#8fc1ff}
+@media(max-width:640px){
+  header{padding-top:calc(8px + env(safe-area-inset-top))}
+  nav button{min-width:0;font-size:10px;padding:6px 0}
+  nav button:before{font-size:18px}
+  .seg button{padding:9px 6px;font-size:13px}
+  .botgrid{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
@@ -115,7 +151,7 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
   <h1>Cripto Pro <small>Sinais de compra e venda testados no histórico de cada moeda</small></h1>
   <div class="row">
     <span class="status"><span class="dot" id="dot"></span><span id="st">Iniciando…</span></span>
-    <select id="tf" title="Período de cada vela"><option value="1d">Diário (mais confiável)</option><option value="4h">4 horas (mais sinais)</option></select>
+    <select id="tf" title="Período de cada vela"><option value="1d">Diário</option><option value="4h">4 horas</option></select>
     <select id="cur"><option>BRL</option><option>USD</option></select>
     <button id="reload" title="Reanalisar agora">↻</button><button id="inst" class="pri">Instalar</button>
   </div>
@@ -178,25 +214,41 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
 </section>
 
 <section class="tab" id="t-bot">
-  <div class="warnbox"><b>Simulação.</b> O bot decide sozinho e opera na carteira simulada com os preços reais ao vivo, como se estivesse na sua conta — mas <b>nenhuma ordem real é enviada</b> à Binance. Ele trabalha enquanto o app está aberto.</div>
-  <div class="panel"><h2>Bots em segundo plano <span class="sig WAIT" id="srvState">—</span></h2>
-    <div class="note" id="srvInfo">Carregando…</div>
-    <div id="srvMkt" class="note" style="margin-top:8px;color:var(--tx2)"></div>
-    <div id="tioBox" style="margin-top:10px"></div>
-    <h3 style="margin-top:12px">Ranking da equipe</h3>
+  <div class="seg" id="botSeg"><button data-s="equipe" class="on">Equipe</button><button data-s="decisoes">Decisões</button><button data-s="regras">Regras</button><button data-s="aparelho">Este aparelho</button></div>
+
+  <div class="sub on" id="s-equipe">
+    <div class="panel">
+      <div class="row" style="justify-content:space-between"><h2 style="margin:0">Bots em segundo plano</h2><span class="sig WAIT" id="srvState">—</span></div>
+      <div class="note" id="srvInfo" style="margin-top:4px">Carregando…</div>
+      <div id="srvMkt" class="mkt"></div>
+    </div>
+    <div id="tioBox"></div>
+    <div class="botgrid" id="srvCards"></div>
+    <details class="panel"><summary>Ver o ranking em tabela</summary>
     <div class="tw"><table><thead><tr><th>#</th><th>Bot</th><th>Situação</th><th>Resultado</th><th>Segurar BTC</th><th>Pior queda</th><th>Saldo do bot</th><th>Recolhido</th><th>Encerradas</th><th>Abertas</th><th>Preset</th></tr></thead><tbody id="srvK"></tbody></table></div>
     <p class="note">Saldo do bot = dinheiro em caixa + moedas compradas, a preço de hoje (“todo em caixa” = nenhuma compra aberta). Resultado = saldo + o que o TioPatinhas já recolheu − R$ 1.000 iniciais, sem o efeito do dólar, já descontando taxas e a perda entre preço de compra e de venda. “Segurar BTC” mostra quanto teria rendido só comprar Bitcoin no dia em que o bot começou: é a referência que o bot precisa superar. Ordenado do melhor para o pior.</p>
-    <h3 style="margin-top:12px">Pronto para dinheiro real?</h3>
-    <div class="tw"><table><thead><tr><th>Bot</th><th>Selo</th><th>Operações</th><th>Lucro</th><th>Melhor que segurar BTC</th><th>Pior queda</th></tr></thead><tbody id="srvReady"></tbody></table></div>
-    <p class="note" id="srvReadyNote"></p>
-    <h3 style="margin-top:12px">Teste: altcoins menores</h3><div id="srvAlt" class="note" style="color:var(--tx2)"></div>
-    <h3 style="margin-top:12px">Seleção automática dos presets</h3><div id="srvEvo" class="note" style="color:var(--tx2)"></div>
-    <h3 style="margin-top:12px">Avisos no celular</h3><div id="srvNote" class="note" style="color:var(--tx2)"></div>
-    <h3 style="margin-top:12px">Posições abertas</h3>
-    <div class="tw"><table><thead><tr><th>Bot</th><th>Moeda</th><th>Compra</th><th>Preço na checagem</th><th>Resultado</th><th>Alvo / limite</th></tr></thead><tbody id="srvPos"></tbody></table></div>
-    <h3 style="margin-top:12px">Diário em segundo plano</h3>
-    <div class="tw"><table><thead><tr><th>Quando</th><th>Bot</th><th>Moeda</th><th>Ação</th><th>Preço</th><th>Resultado</th><th>Motivo</th></tr></thead><tbody id="srvLog"></tbody></table></div>
-    <p class="note">Estes bots são autônomos: rodam sozinhos nos servidores do GitHub, com o app fechado, cada um com o seu preset e a sua carteira simulada de R$ 1.000. O TioPatinhas recolhe para o cofre o lucro realizado de cada bot quando ele passa de 1% do capital. Nenhuma ordem real é enviada. Para ligar, desligar, mudar um preset ou criar outro bot, edite o arquivo <b>bot/config.json</b> no repositório.</p></div>
+    </details>
+  </div>
+
+  <div class="sub" id="s-decisoes">
+    <div class="panel"><h2>Posições abertas</h2>
+      <div class="tw"><table><thead><tr><th>Bot</th><th>Moeda</th><th>Compra</th><th>Preço na checagem</th><th>Resultado</th><th>Alvo / limite</th></tr></thead><tbody id="srvPos"></tbody></table></div></div>
+    <div class="panel"><h2>Diário dos bots em segundo plano</h2>
+      <div class="tw"><table><thead><tr><th>Quando</th><th>Bot</th><th>Moeda</th><th>Ação</th><th>Preço</th><th>Resultado</th><th>Motivo</th></tr></thead><tbody id="srvLog"></tbody></table></div></div>
+  </div>
+
+  <div class="sub" id="s-regras">
+    <div class="panel"><h2>Pronto para dinheiro real?</h2>
+      <div class="tw"><table><thead><tr><th>Bot</th><th>Selo</th><th>Operações</th><th>Lucro</th><th>Melhor que segurar BTC</th><th>Pior queda</th></tr></thead><tbody id="srvReady"></tbody></table></div>
+      <p class="note" id="srvReadyNote"></p></div>
+    <div class="panel"><h2>Teste: altcoins menores</h2><div id="srvAlt" class="note" style="color:var(--tx2)"></div></div>
+    <div class="panel"><h2>Seleção automática dos presets</h2><div id="srvEvo" class="note" style="color:var(--tx2)"></div></div>
+    <div class="panel"><h2>Avisos no celular</h2><div id="srvNote" class="note" style="color:var(--tx2)"></div></div>
+    <div class="panel"><h2>Como os bots funcionam</h2><p class="note">Estes bots são autônomos: rodam sozinhos nos servidores do GitHub, com o app fechado, cada um com o seu preset e a sua carteira simulada de R$ 1.000. O TioPatinhas recolhe para o cofre o lucro realizado de cada bot quando ele passa de 1% do capital. Nenhuma ordem real é enviada. Para ligar, desligar, mudar um preset ou criar outro bot, edite o arquivo <b>bot/config.json</b> no repositório.</p></div>
+  </div>
+
+  <div class="sub" id="s-aparelho">
+  <div class="warnbox"><b>Simulação.</b> O bot decide sozinho e opera na carteira simulada com os preços reais ao vivo, como se estivesse na sua conta — mas <b>nenhuma ordem real é enviada</b> à Binance. Ele trabalha enquanto o app está aberto.</div>
   <div class="panel">
     <div class="row" style="justify-content:space-between"><div><h2 style="margin:0">Bot neste aparelho <span class="sig WAIT" id="botState">DESLIGADO</span></h2><div class="note" id="botInfo"></div></div><button class="pri" id="botBtn">Ligar bot</button></div>
     <div class="row" style="margin-top:10px">
@@ -207,6 +259,12 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
       <label class="note">Entrada <select id="botEntry"><option value="ALL">gatilho novo ou regra ainda perto da entrada</option><option value="BUY">só gatilho novo de compra</option></select></label>
     </div>
   </div>
+  <div class="kpis" id="botK"></div>
+  <div class="panel"><h2>Limites de decisão por moeda</h2>
+    <div class="tw"><table><thead><tr><th>Moeda</th><th>Sinal</th><th>Vende com lucro de</th><th>Vende com perda de</th><th>Situação</th></tr></thead><tbody id="botLim"></tbody></table></div>
+    <p class="note">Já com os multiplicadores do preset deste bot. Os limites vêm do histórico de cada moeda: o <b>ganho médio</b> das operações vencedoras da regra escolhida vira o alvo de lucro, e a <b>perda média</b> das perdedoras vira o limite de perda. O bot compra em gatilho validado e vende no que acontecer primeiro: alvo de lucro, limite de perda ou saída da regra.</p></div>
+  <div class="panel"><h2>Diário de decisões do bot</h2><div class="tw"><table><thead><tr><th>Quando</th><th>Moeda</th><th>Ação</th><th>Preço</th><th>Resultado</th><th>Motivo</th></tr></thead><tbody id="botLog"></tbody></table></div>
+    <div class="row" style="margin-top:8px"><button class="dan" id="botClr">Limpar diário</button></div></div>
   <div class="panel"><h2>Central de bots</h2>
     <div id="fleetHead" class="note"></div>
     <div class="tw" style="margin-top:8px"><table><thead><tr><th>Bot</th><th>Onde roda</th><th>Preset</th><th>Resultado</th><th>Operações</th><th>Atualizado</th><th></th></tr></thead><tbody id="fleetBody"></tbody></table></div>
@@ -235,13 +293,9 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
       <textarea id="sTxt" readonly placeholder="O relatório aparece aqui" style="margin-top:8px" onclick="this.select()"></textarea>
     </div>
   </div>
-  <div class="kpis" id="botK"></div>
-  <div class="panel"><h2>Limites de decisão por moeda</h2>
-    <div class="tw"><table><thead><tr><th>Moeda</th><th>Sinal</th><th>Vende com lucro de</th><th>Vende com perda de</th><th>Situação</th></tr></thead><tbody id="botLim"></tbody></table></div>
-    <p class="note">Já com os multiplicadores do preset deste bot. Os limites vêm do histórico de cada moeda: o <b>ganho médio</b> das operações vencedoras da regra escolhida vira o alvo de lucro, e a <b>perda média</b> das perdedoras vira o limite de perda. O bot compra em gatilho validado e vende no que acontecer primeiro: alvo de lucro, limite de perda ou saída da regra.</p></div>
-  <div class="panel"><h2>Diário de decisões do bot</h2><div class="tw"><table><thead><tr><th>Quando</th><th>Moeda</th><th>Ação</th><th>Preço</th><th>Resultado</th><th>Motivo</th></tr></thead><tbody id="botLog"></tbody></table></div>
-    <div class="row" style="margin-top:8px"><button class="dan" id="botClr">Limpar diário</button></div></div>
+</div>
 </section>
+
 
 <section class="tab" id="t-base">
   <div class="panel"><h2>Perfil de comportamento de cada moeda</h2>
@@ -286,7 +340,7 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
 </div>
 
 <script>
-const APP_VERSION='1.6.0';document.getElementById('appVer').textContent=APP_VERSION;
+const APP_VERSION='1.7.0';document.getElementById('appVer').textContent=APP_VERSION;
 //<core>
 const COINS=[['BTC','Bitcoin'],['ETH','Ethereum'],['XRP','XRP'],['BNB','BNB'],['SOL','Solana'],['TRX','TRON'],['DOGE','Dogecoin'],['ADA','Cardano'],['LINK','Chainlink'],['LTC','Litecoin'],['AVAX','Avalanche'],['SUI','Sui'],['DOT','Polkadot'],['ZEC','Zcash'],['SHIB','Shiba Inu']].map(([sym,name])=>({sym,name,pair:sym+'USDT'}));
 const FEE=0.001, WARM=200, SPLIT=0.7;
@@ -362,6 +416,11 @@ function corrTail(a,b,k){const x=a.slice(-k),y=b.slice(-k);if(x.length<k||y.leng
 
 // ===================== ESTADO & BASE LOCAL =====================
 const DOW=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+// altcoins do teste (BG09/BG10): a lista aprovada vem do estado dos bots em segundo plano
+const ALTNAMES={XLM:'Stellar',NEAR:'NEAR Protocol',BCH:'Bitcoin Cash',UNI:'Uniswap',HBAR:'Hedera',TAO:'Bittensor',AAVE:'Aave',PEPE:'Pepe',WLFI:'World Liberty',ONDO:'Ondo',ENA:'Ethena',ASTER:'Aster',ICP:'Internet Computer',PUMP:'Pump.fun',WLD:'Worldcoin',ETC:'Ethereum Classic',ARB:'Arbitrum',POL:'Polygon',JUP:'Jupiter',RENDER:'Render',INJ:'Injective',ALGO:'Algorand',ATOM:'Cosmos',ZRO:'LayerZero',CAKE:'PancakeSwap',STX:'Stacks',FIL:'Filecoin',ETHFI:'ether.fi',DASH:'Dash',PYTH:'Pyth Network',NEXO:'Nexo',VET:'VeChain',KITE:'Kite',RAY:'Raydium',APT:'Aptos',TIA:'Celestia',FET:'Fetch.ai',CRV:'Curve',SEI:'Sei',PENGU:'Pudgy Penguins',HYPE:'Hyperliquid',XMR:'Monero',KAS:'Kaspa',MNT:'Mantle',NIGHT:'Midnight',LIT:'Lighter'};
+let ALTS=[],altCost=0.0025;
+function setAlts(list,cost){if(cost)altCost=cost;ALTS=list.filter(s=>!COINS.some(c=>c.sym===s)).map(s=>({sym:s,name:ALTNAMES[s]||s,pair:s+'USDT',alt:true}));for(const a of ALTS)SLIP[a.sym]=altCost-FEE;}
+const ALL=()=>COINS.concat(ALTS),coinOf=s=>ALL().find(c=>c.sym===s);
 const SIGL={BUY:'COMPRAR',HOLD:'MANTER',SELL:'VENDER',WAIT:'AGUARDAR',WEAK:'SINAL FRACO'};
 const $=s=>document.querySelector(s);
 const db={get(k,def){try{const v=localStorage.getItem('cp_'+k);return v?JSON.parse(v):def;}catch(e){return def;}},set(k,v){try{localStorage.setItem('cp_'+k,JSON.stringify(v));}catch(e){}}};
@@ -372,6 +431,7 @@ const LOGCATS=['Sistema','Sinais','Carteira','Bot','Área segura','Ordens reais'
 function logEv(cat,msg,quiet=0){const now=Date.now();if(quiet){for(let i=logs.length-1;i>=0&&now-logs[i].t<quiet;i--)if(logs[i].c===cat&&logs[i].m===msg)return;}
   logs.push({t:now,c:cat,m:String(msg).slice(0,300)});if(logs.length>2000)logs=logs.slice(-2000);db.set('log',logs);if(typeof tab!=='undefined'&&tab==='logs')renderLogs();}
 let pf=db.get('pf',{cash:null,start:null,pos:[],closed:[]});
+{const sa=db.get('alts',null);if(sa)setAlts(sa.list,sa.cost);}
 let bot=Object.assign({on:false,frac:0.2,max:5,tpM:1,slM:1,entry:'ALL',log:[],done:{},last:0},db.get('bot',{}));
 let dev=db.get('dev',null);if(!dev){const r=()=>Array.from(crypto.getRandomValues(new Uint8Array(4)),b=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b%32]).join('');dev={id:'AP-'+r()+'-'+r()};db.set('dev',dev);}
 let me=db.get('me',{id:'BOT01',name:'Principal',master:true}),fleet=db.get('fleet',{bots:[],next:2}),fleetAsk=-1;
@@ -405,8 +465,8 @@ async function getK(pair,interval){
   }catch(e){const c=db.get(key,null);if(c){c.cached=true;return c;}throw e;}
 }
 async function loadAll(){
-  setSt('poll','Baixando histórico…');let done=0,fail=0;const total=COINS.length;
-  const q=[...COINS];
+  setSt('poll','Baixando histórico…');let done=0,fail=0;const total=ALL().length;
+  const q=[...ALL()];
   async function worker(){while(q.length){const c=q.shift();try{
       const day=await getK(c.pair,'1d');const d=tf==='1d'?day:await getK(c.pair,tf);
       K[c.sym]={day,d,last:d.last};
@@ -423,19 +483,19 @@ async function loadAll(){
 function compute(){
   const bpd=tf==='1d'?1:6,recent=tf==='1d'?2:3;
   const btcR=K.BTC?(()=>{const c=K.BTC.day.c,r=[];for(let i=1;i<c.length;i++)r.push(c[i]/c[i-1]-1);return r;})():null;
-  for(const c of COINS){const k=K[c.sym];if(!k)continue;
+  for(const c of ALL()){const k=K[c.sym];if(!k)continue;
     A[c.sym]=analyze(k.d,bpd,recent,COST(c.sym));P[c.sym]=profile(k.day,c.sym==='BTC'?null:btcR);}
   // grava perfis e mudanças de sinal na base
   const prof={};for(const s in P){const p=P[s];prof[s]={tendencia:p.trend,oscSemanal:p.vol,piorQueda:p.maxDD,quedaAtual:p.ddNow,corrBTC:p.corr,aposQueda:p.afterDrop,aposAlta:p.afterPump,melhorDia:DOW[p.bestDow],piorDia:DOW[p.worstDow],autocorr:p.ac,regra:A[s]?.best.s.name,validada:A[s]?.valid};}
   db.set('perfis',{ts:Date.now(),tf,perfis:prof});
   if(pf.cash==null){const s=usdbrl?1000/usdbrl:200;pf={cash:s,start:s,fx0:usdbrl,pos:[],closed:[]};db.set('pf',pf);}
   if(pf.cash!=null&&!pf.fx0&&usdbrl){const g=1000/pf.start;pf.fx0=Math.abs(g/usdbrl-1)<0.08?g:usdbrl;db.set('pf',pf);}
-  const ls=db.get('lastsig',{});for(const c of COINS){const a=A[c.sym];if(!a)continue;const k=c.sym+tf;if(ls[k]&&ls[k]!==a.sig)logEv('Sinais',`${c.sym}: sinal mudou de ${SIGL[ls[k]]} para ${SIGL[a.sig]} a ${fm(K[c.sym].last)} · regra ${a.best.s.name}${a.valid?' (validada)':' (não validada)'}`);ls[k]=a.sig;}db.set('lastsig',ls);
+  const ls=db.get('lastsig',{});for(const c of ALL()){const a=A[c.sym];if(!a)continue;const k=c.sym+tf;if(ls[k]&&ls[k]!==a.sig)logEv('Sinais',`${c.sym}: sinal mudou de ${SIGL[ls[k]]} para ${SIGL[a.sig]} a ${fm(K[c.sym].last)} · regra ${a.best.s.name}${a.valid?' (validada)':' (não validada)'}`);ls[k]=a.sig;}db.set('lastsig',ls);
   botTick();render();
 }
 let ws,wsOn=false;
 function connectWS(){
-  const streams=[...COINS.map(c=>c.pair.toLowerCase()+'@miniTicker'),'usdtbrl@miniTicker'].join('/');
+  const streams=[...ALL().map(c=>c.pair.toLowerCase()+'@miniTicker'),'usdtbrl@miniTicker'].join('/');
   try{ws=new WebSocket('wss://data-stream.binance.vision/stream?streams='+streams);}catch(e){return;}
   ws.onopen=()=>{wsOn=true;logEv('Sistema','Preços ao vivo conectados',6e5);if(Object.keys(A).length)setSt('live','Ao vivo');};
   ws.onmessage=ev=>{const d=JSON.parse(ev.data).data;if(!d)return;const p=+d.c,o=+d.o;
@@ -495,10 +555,13 @@ function renderResumo(){const el=$('#resumo');if(!el||!Object.keys(A).length)ret
   const mine=pf.pos.filter(x=>x.bot),man=pf.pos.filter(x=>!x.bot);
   li.push(`<b>Bot deste aparelho (${me.id}).</b> `+(!bot.on?'Desligado: nada é comprado ou vendido sozinho neste aparelho.':mine.length?`Ligado, com ${mine.length} posição(ões) aberta(s):<br>`+mine.map(x=>posLine(x,price(x.sym)||x.price)).join('<br>'):'Ligado e parado, esperando um gatilho de compra validado. Ele confere os preços a cada 1,5 segundo enquanto o app está aberto.'));
   if(man.length)li.push(`<b>Compras manuais simuladas.</b> `+man.map(x=>posLine(x,price(x.sym)||x.price)).join('<br>'));
-  const sb=srvBots();if(sb.length){const every=srv.runs>1?(srv.updated-srv.since)/36e5/(srv.runs-1):null;
-    li.push(`<b>Bots em segundo plano (autônomos).</b> Última checagem ${ago(srv.updated)}.`+(every&&every>1?` Atenção: o GitHub tem rodado uma checagem a cada ${every.toFixed(1).replace('.',',')} h em média, e não a cada 15 minutos.`:'')+'<br>'+sb.map(b=>{const val=b.value??b.cash,s=fxSplit(b.start,val,b.fx0);
-      return `<b>${esc(b.id)} ${esc(b.name||'')}</b> — ${!b.on?'desligado':b.pos.length?`${b.pos.length} posição(ões)`:b.paused?'pausado pelo freio de perda':b.blocked?'em caixa (filtro de mercado)':'em caixa, esperando gatilho'}${b.ready?.ok?' · <b class="up">PRONTO para real</b>':''}; resultado ${bOpsTxt(b)}`+(b.swept?` (${fm2(b.swept)} já no cofre)`:'')+(b.closed.length?` em ${b.closed.length} encerrada(s)`:'')+(b.pos.length?'<br>'+b.pos.map(x=>'&nbsp;&nbsp;'+posLine(x,srv.marks?.[x.sym]||x.price)).join('<br>'):'');}).join('<br>'));
-    if(srv.tio)li.push(tioTxt(true));}
+  const sb=srvBots();if(sb.length){const every=srv.runs>1?(srv.updated-srv.since)/36e5/(srv.runs-1):null,ord=[...sb].sort((a,c)=>bTot(c)/c.start-bTot(a)/a.start);
+    const withPos=sb.filter(b=>b.pos.length).length,paused=sb.filter(b=>b.paused).length,filt=sb.filter(b=>!b.pos.length&&!b.paused&&b.blocked).length,wait=sb.length-withPos-paused-filt,ready=sb.filter(b=>b.ready?.ok);
+    const nPos=sb.reduce((v,b)=>v+b.pos.length,0),best=ord[0],worst=ord[ord.length-1],fmtB=b=>`${esc(b.id)} ${esc(b.name||'')} (${bOpsTxt(b)})`;
+    li.push(`<b>Equipe de ${sb.length} bots (autônomos).</b> Última checagem ${ago(srv.updated)}${every&&every>1?`; o GitHub tem rodado uma a cada ${every.toFixed(1).replace('.',',')} h`:''}.<br>`+
+      `${withPos?`${withPos} com compras abertas (${nPos} posição(ões))`:'Nenhum com compra aberta'} · ${filt} parados pelo filtro de mercado · ${wait} esperando gatilho${paused?` · ${paused} pausado(s) pelo freio`:''}.<br>`+
+      `Melhor: ${fmtB(best)} · Pior: ${fmtB(worst)}.`+(ready.length?`<br><b class="up">Pronto para real:</b> ${ready.map(b=>esc(b.id)).join(', ')}.`:'')+
+      `<br>${tioTxt(true)} <a href="#" onclick="goTeam();return false">Ver a equipe →</a>`);}
   const v=pfValue(),s=fxSplit(pf.start,v,pf.fx0);
   li.push(`<b>Carteira simulada deste aparelho.</b> Vale ${fm2(v)}. `+(s.brl?`Desde o início: ${sgn(s.ops,brl)} vieram de operações e ${sgn(s.fx,brl)} vieram só da variação do dólar. O saldo simulado é guardado em dólar (USDT), como na Binance; quando o dólar sobe, o valor em reais sobe mesmo sem nenhuma compra ou venda.`:`Resultado das operações desde o início: ${sgn(v-pf.start,fm2)}.`));
   const last=logs.filter(x=>x.c==='Bot'||x.c==='Sinais'||x.c==='Carteira'||x.c==='Ordens reais').slice(-3).reverse();
@@ -521,23 +584,24 @@ function renderKpis(){
 }
 function renderPainel(){
   renderKpis();renderResumo();if(Date.now()-srvTs>120000)loadSrv();
-  const acts=COINS.filter(c=>A[c.sym]&&(A[c.sym].sig==='BUY'||A[c.sym].sig==='SELL'));
+  const acts=ALL().filter(c=>A[c.sym]&&(A[c.sym].sig==='BUY'||A[c.sym].sig==='SELL'));
   $('#opp').innerHTML=acts.length?acts.map(c=>{const a=A[c.sym];return `<div class="card" style="cursor:pointer" onclick="pick('${c.sym}')"><div class="row" style="justify-content:space-between"><b>${c.name}</b>${sigBadge(a)}</div><div class="s">${a.best.s.name} · há ${a.since} ${tf==='1d'?'dia(s)':'vela(s) de 4h'}</div><div class="s">Teste cego: <span class="${cl(a.best.oos.ret)}">${pc(a.best.oos.ret)}</span> · acerto ${pcn(a.best.oos.win)}</div></div>`;}).join('')
     :'<span class="note">Nenhum gatilho novo de compra ou venda agora. Em mercado sem sinal, ficar de fora também é uma decisão — a tabela abaixo mostra o que cada regra está esperando.</span>';
-  $('#sigBody').innerHTML=COINS.map(c=>{const a=A[c.sym],p=P[c.sym];if(!p)return'';const ch=live[c.sym]?.ch;
+  const grpRow=(c,i,arr,cols)=>c.alt&&!(arr[i-1]?.alt)?`<tr><td colspan="${cols}" class="grp">Altcoins menores — moedas do teste dos bots BG09 e BG10 (custo maior)</td></tr>`:'';
+  $('#sigBody').innerHTML=ALL().map((c,i,arr)=>grpRow(c,i,arr,11)+(()=>{const a=A[c.sym],p=P[c.sym];if(!p)return'';const ch=live[c.sym]?.ch;
     return `<tr class="click" onclick="pick('${c.sym}')"><td><b>${c.sym}</b> <span class="mut">${c.name}</span></td><td>${sigBadge(a)}</td><td data-px="${c.sym}">${fm(price(c.sym))}</td><td data-ch="${c.sym}" class="${cl(ch)}">${pc(ch,2)}</td><td class="${cl(p.r7)}">${pc(p.r7)}</td><td class="${cl(p.r30)}">${pc(p.r30)}</td>`+
-    (a?`<td>${a.best.s.name}</td><td><span class="${cl(a.best.oos.ret)}">${pc(a.best.oos.ret)}</span> <span class="val ${a.valid?'ok':'no'}">${a.valid?'validado':'não validado'}</span></td><td>${pcn(a.best.oos.win)} <span class="mut">(${a.best.oos.n})</span></td><td class="${cl(a.week)}">${pc(a.week,2)}</td><td class="${cl(a.best.oos.ret-a.best.oos.bh)}">${pc(a.best.oos.ret-a.best.oos.bh)}</td>`:'<td colspan="5" class="mut">histórico insuficiente</td>')+'</tr>';}).join('');
-  $('#sigCards').innerHTML=COINS.map(c=>{const a=A[c.sym],p=P[c.sym];if(!p)return'';const ch=live[c.sym]?.ch;
+    (a?`<td>${a.best.s.name}</td><td><span class="${cl(a.best.oos.ret)}">${pc(a.best.oos.ret)}</span> <span class="val ${a.valid?'ok':'no'}">${a.valid?'validado':'não validado'}</span></td><td>${pcn(a.best.oos.win)} <span class="mut">(${a.best.oos.n})</span></td><td class="${cl(a.week)}">${pc(a.week,2)}</td><td class="${cl(a.best.oos.ret-a.best.oos.bh)}">${pc(a.best.oos.ret-a.best.oos.bh)}</td>`:'<td colspan="5" class="mut">histórico insuficiente</td>')+'</tr>';})()).join('');
+  $('#sigCards').innerHTML=ALL().map((c,i,arr)=>(c.alt&&!(arr[i-1]?.alt)?'<h3 style="margin:14px 0 8px">Altcoins menores (teste)</h3>':'')+(()=>{const a=A[c.sym],p=P[c.sym];if(!p)return'';const ch=live[c.sym]?.ch;
     return `<div class="scard" onclick="pick('${c.sym}')"><div class="r1"><span><b>${c.sym}</b> <span class="mut">${c.name}</span></span>${sigBadge(a)}</div>
     <div class="r2"><b data-px="${c.sym}">${fm(price(c.sym))}</b><span>24h <span data-ch="${c.sym}" class="${cl(ch)}">${pc(ch,2)}</span> · 7d <span class="${cl(p.r7)}">${pc(p.r7)}</span></span></div>`+
-    (a?`<div class="r3">${a.best.s.name} · teste cego <span class="${cl(a.best.oos.ret)}">${pc(a.best.oos.ret)}</span> <span class="val ${a.valid?'ok':'no'}">${a.valid?'validado':'não validado'}</span> · média/sem. <span class="${cl(a.week)}">${pc(a.week,2)}</span></div>`:'')+'</div>';}).join('');
+    (a?`<div class="r3">${a.best.s.name} · teste cego <span class="${cl(a.best.oos.ret)}">${pc(a.best.oos.ret)}</span> <span class="val ${a.valid?'ok':'no'}">${a.valid?'validado':'não validado'}</span> · média/sem. <span class="${cl(a.week)}">${pc(a.week,2)}</span></div>`:'')+'</div>';})()).join('');
   const rows=COINS.filter(c=>P[c.sym]);
   hbars($('#bar30'),rows.map(c=>({label:c.sym,v:P[c.sym].r30})).sort((a,b)=>b.v-a.v),v=>pc(v));
   hbars($('#barVol'),rows.map(c=>({label:c.sym,v:P[c.sym].vol})).sort((a,b)=>a.v-b.v),v=>'± '+pcn(v,1),false);
 }
 function renderMoeda(){
-  $('#chips').innerHTML=COINS.map(c=>`<span class="chip ${c.sym===sel?'on':''}" onclick="pick('${c.sym}')">${c.sym}${A[c.sym]&&(A[c.sym].sig==='BUY'||A[c.sym].sig==='SELL')?' •':''}</span>`).join('');
-  const c=COINS.find(x=>x.sym===sel),k=K[sel],a=A[sel],p=P[sel];if(!k||!p){$('#hero').innerHTML='<span class="note">Sem dados para esta moeda.</span>';return;}
+  $('#chips').innerHTML=ALL().map((c,i,arr)=>(c.alt&&!(arr[i-1]?.alt)?'<span class="chipsep">altcoins</span>':'')+`<span class="chip ${c.sym===sel?'on':''}${c.alt?' alt':''}" onclick="pick('${c.sym}')">${c.sym}${A[c.sym]&&(A[c.sym].sig==='BUY'||A[c.sym].sig==='SELL')?' •':''}</span>`).join('');
+  const c=coinOf(sel)||COINS[0],k=K[sel],a=A[sel],p=P[sel];if(!k||!p){$('#hero').innerHTML='<span class="note">Sem dados para esta moeda.</span>';return;}
   const d=k.d,n=d.c.length,last=n-1,h4=tf!=='1d';
   let hero=`<div><div class="mut">${c.name} (${c.sym}) · ${tf==='1d'?'diário':'4 horas'}</div><div class="p" id="heroP">${fm(price(sel))}</div><div>${sigBadge(a)} ${a?`<span class="val ${a.valid?'ok':'no'}">${a.valid?'regra validada':'regra não validada'}</span>`:''}</div></div>`;
   if(a){const s=a.best.s,why=s.why(d,a.I,last,fm);
@@ -603,7 +667,8 @@ function botTick(){if(!bot.on||!Object.keys(A).length)return;let ch=false;bot.la
     botLog(k.c.sym,'COMPRA',(k.a.sig==='BUY'?'Gatilho de compra validado':'Regra comprada e preço ainda perto da entrada')+` · ${k.a.best.s.name}`,k.p,null);ch=true;}
   if(ch){db.set('pf',pf);db.set('bot',bot);if(tab==='bot'||tab==='carteira'||tab==='moeda')render();}}
 const SRV='https://raw.githubusercontent.com/walquesouza26-dotcom/cripto-pro/bot-data/state.json';let srv=null,srvTs=0,srvErr='';
-async function loadSrv(){srvTs=Date.now();try{const r=await fetch(SRV+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error(r.status);srv=await r.json();srvErr='';}catch(e){srvErr=srv?'':'Ainda sem dados: o bot em segundo plano não rodou a primeira vez (ou o agendamento está desativado no GitHub).';}if(tab==='bot')renderSrv();if(tab==='painel')renderResumo();}
+async function loadSrv(){srvTs=Date.now();try{const r=await fetch(SRV+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error(r.status);srv=await r.json();srvErr='';
+    const U=srv.universes?.altcoins;if(U){const list=U.eligible.map(x=>x.sym),old=ALTS.map(a=>a.sym).join();setAlts(list,U.rules?.custoPorLado);db.set('alts',{list,cost:U.rules?.custoPorLado});if(list.join()!==old&&Object.keys(K).length){loadAll();try{ws&&ws.close();}catch(e){}}}}catch(e){srvErr=srv?'':'Ainda sem dados: o bot em segundo plano não rodou a primeira vez (ou o agendamento está desativado no GitHub).';}if(tab==='bot')renderSrv();if(tab==='painel')renderResumo();}
 const srvBots=()=>srv?.bots?Object.entries(srv.bots).map(([id,b])=>({id,...b})):[];
 const bState=b=>!b.on?'<span class="sig WAIT">DESLIGADO</span>':b.ready?.ok?'<span class="sig BUY">PRONTO</span>':b.paused?'<span class="sig SELL">PAUSADO</span>':b.blocked?'<span class="sig WEAK">FILTRO</span>':'<span class="sig HOLD">EM TESTE</span>';
 const bVal=b=>b.value??b.cash,bTot=b=>bVal(b)+(b.swept||0),bOps=b=>{const s=fxSplit(b.start,bTot(b),b.fx0);return s.brl?s.ops:bTot(b)-b.start;},bOpsTxt=b=>{const s=fxSplit(b.start,bTot(b),b.fx0);return s.brl?sgn(s.ops,brl):sgn(bTot(b)-b.start,fm2);};
@@ -614,12 +679,19 @@ function tioTxt(short){const t=srv?.tio;if(!t)return'';const bs=srvBots(),n=t.sw
     <div class="s" style="margin-top:6px">Equipe: ${bs.length} bots · capital inicial ${cur==='BRL'&&bs.every(b=>b.fx0)?brl(bs.reduce((v,b)=>v+b.start*b.fx0,0)):fm2(ini)} · saldo dos bots ${fm2(neg)} · no cofre ${fm2(t.vault)} · resultado das operações ${cur==='BRL'?sgn(ops,brl):sgn(ops,fm2)}</div></div>`;}
 function renderSrv(){
   const bs=srvBots();
-  if(!bs.length){$('#srvState').textContent='—';$('#srvInfo').textContent=srvErr||(srv?'Aguardando a primeira checagem dos novos bots.':'Carregando…');$('#srvK').innerHTML='';$('#tioBox').innerHTML='';$('#srvMkt').innerHTML='';$('#srvReady').innerHTML='';$('#srvPos').innerHTML='';$('#srvLog').innerHTML='';return;}
+  if(!bs.length){$('#srvState').textContent='—';$('#srvInfo').textContent=srvErr||(srv?'Aguardando a primeira checagem dos novos bots.':'Carregando…');$('#srvK').innerHTML='';$('#srvCards').innerHTML='';$('#tioBox').innerHTML='';$('#srvMkt').innerHTML='';$('#srvReady').innerHTML='';$('#srvPos').innerHTML='';$('#srvLog').innerHTML='';return;}
   const age=(Date.now()-srv.updated)/6e4,stale=age>180,anyOn=bs.some(b=>b.on),every=srv.runs>1?(srv.updated-srv.since)/36e5/(srv.runs-1):null;
   $('#srvState').textContent=!anyOn?'DESLIGADOS':stale?'ATRASADO':'RODANDO';$('#srvState').className='sig '+(!anyOn?'WAIT':stale?'WEAK':'BUY');
   $('#srvInfo').textContent=`Última checagem: ${dt(srv.updated,true)} (${ago(srv.updated)}) · ${srv.runs} checagem(ns) desde ${dt(srv.since)}`+(every?` · uma a cada ${every<1?Math.round(every*60)+' min':every.toFixed(1).replace('.',',')+' h'} em média`:'')+(stale?' · o GitHub está atrasando ou pausou o agendamento':'');
   const px=s=>srv.marks?.[s];
   $('#tioBox').innerHTML=tioTxt();
+  $('#srvCards').innerHTML=[...bs].sort((a,c)=>bTot(c)/c.start-bTot(a)/a.start).map((b,i)=>{const r=bTot(b)/b.start-1,bh=b.bench?.ret,w=b.closed.filter(x=>x.pnl>0).length;
+    return `<div class="bcard"><div class="bhead"><span class="rank">${i+1}º</span><div style="flex:1;min-width:0"><b>${esc(b.id)}</b> <span class="bname">${esc(b.name||'')}</span></div>${bState(b)}</div>
+      <div class="bres ${Math.abs(r)<5e-5?'':cl_(r)}">${bOpsTxt(b)} <small>${pc(r,2)}</small></div>
+      <div class="bline"><span>Saldo ${fm2(bVal(b))}</span><span>${b.pos.length?pcn(1-b.cash/bVal(b))+' aplicado':'todo em caixa'}</span></div>
+      <div class="bline"><span>${b.closed.length?`${b.closed.length} encerrada(s) · ${pcn(w/b.closed.length)} acerto`:'nenhuma operação encerrada'}</span><span>${b.pos.length} aberta(s)</span></div>
+      <div class="bline"><span>Segurar BTC: <b class="${cl_(bh)}">${bh==null?'—':pc(bh,2)}</b></span><span>${b.swept?'No cofre: '+fm2(b.swept):''}</span></div>
+      <div class="bpreset">${b.cfg?pTxt(b.cfg):''}${b.evolved?' · preset ajustado':''}${b.blocked&&b.on?`<br>${esc(b.blocked)}`:''}</div></div>`;}).join('');
   $('#srvK').innerHTML=[...bs].sort((a,c)=>bTot(c)/c.start-bTot(a)/a.start).map((b,i)=>{const w=b.closed.filter(x=>x.pnl>0).length,r=bTot(b)/b.start-1,bh=b.bench?.ret;
     return `<tr><td>${i+1}º</td><td><b>${esc(b.id)}</b> ${esc(b.name||'')}${b.evolved?' <span class="val">preset ajustado</span>':''}</td><td>${bState(b)}</td><td>${bOpsTxt(b)} <span class="mut">(${pc(r,2)})</span></td><td class="${cl_(bh)}">${bh==null?'—':pc(bh,2)}</td><td>${b.maxDD!=null?'−'+pcn(b.maxDD,1):'—'}</td><td>${fm2(bVal(b))} <span class="mut">${b.pos.length?pcn(1-b.cash/bVal(b))+' aplicado':'todo em caixa'}</span></td><td>${b.swept?fm2(b.swept):'—'}</td><td>${b.closed.length?`${b.closed.length} · ${pcn(w/b.closed.length)} acerto`:'nenhuma'}</td><td>${b.pos.length} de ${b.cfg?.max??'—'}</td><td style="white-space:normal;min-width:210px;text-align:left">${b.cfg?pTxt(b.cfg):'—'}</td></tr>`;}).join('');
   const m=srv.market;
@@ -674,8 +746,8 @@ function renderLogs(){
 window.logSet=c=>{logCat=c;renderLogs();};
 function renderBase(){
   const pr=db.get('perfis',null);$('#baseTs').textContent=pr?dt(pr.ts,true):'—';
-  $('#baseBody').innerHTML=COINS.filter(c=>P[c.sym]).map(c=>{const p=P[c.sym],ad=p.afterDrop,ap=p.afterPump;
-    return `<tr class="click" onclick="pick('${c.sym}')"><td><b>${c.sym}</b></td><td>${p.trend}</td><td>± ${pcn(p.vol,1)}</td><td>−${pcn(p.maxDD)}</td><td>−${pcn(p.ddNow)}</td><td>${p.corr==null?'—':p.corr.toFixed(2).replace('.',',')}</td><td class="${cl(ad.avg)}">${pc(ad.avg)} <span class="mut">(${pcn(ad.win)} de ${ad.n})</span></td><td class="${cl(ap.avg)}">${pc(ap.avg)} <span class="mut">(${pcn(ap.win)} de ${ap.n})</span></td><td>${DOW[p.bestDow]}</td><td>${p.ac>0.05?'Continuação':p.ac<-0.05?'Reversão':'Sem padrão'}</td></tr>`;}).join('');
+  $('#baseBody').innerHTML=ALL().filter(c=>P[c.sym]).map((c,i,arr)=>(c.alt&&!(arr[i-1]?.alt)?'<tr><td colspan="10" class="grp">Altcoins menores (teste)</td></tr>':'')+(()=>{const p=P[c.sym],ad=p.afterDrop,ap=p.afterPump;
+    return `<tr class="click" onclick="pick('${c.sym}')"><td><b>${c.sym}</b></td><td>${p.trend}</td><td>± ${pcn(p.vol,1)}</td><td>−${pcn(p.maxDD)}</td><td>−${pcn(p.ddNow)}</td><td>${p.corr==null?'—':p.corr.toFixed(2).replace('.',',')}</td><td class="${cl(ad.avg)}">${pc(ad.avg)} <span class="mut">(${pcn(ad.win)} de ${ad.n})</span></td><td class="${cl(ap.avg)}">${pc(ap.avg)} <span class="mut">(${pcn(ap.win)} de ${ap.n})</span></td><td>${DOW[p.bestDow]}</td><td>${p.ac>0.05?'Continuação':p.ac<-0.05?'Reversão':'Sem padrão'}</td></tr>`;})()).join('');
   const cs=COINS.filter(c=>P[c.sym]);
   const col=v=>{if(v==null)return'transparent';const a=Math.min(1,Math.abs(v));return v>=0?`rgba(57,135,229,${0.12+a*0.78})`:`rgba(230,103,103,${0.12+a*0.78})`;};
   $('#heat').innerHTML='<tr><th></th>'+cs.map(c=>`<th>${c.sym}</th>`).join('')+'</tr>'+cs.map(a=>`<tr><th>${a.sym}</th>`+cs.map(b=>{const v=a===b?1:corrTail(P[a.sym].rets,P[b.sym].rets,90);return `<td style="background:${col(v)}" title="${a.sym} × ${b.sym}">${v==null?'':v.toFixed(1).replace('.',',')}</td>`;}).join('')+'</tr>').join('');
@@ -684,7 +756,7 @@ function renderBase(){
 }
 function render(){({painel:renderPainel,moeda:renderMoeda,carteira:renderCarteira,bot:renderBot,base:renderBase,logs:renderLogs,guia(){}})[tab]();if(tab!=='painel')renderKpis();}
 function liveUpdate(){
-  if(tab==='painel'){for(const c of COINS){const l=live[c.sym];if(!l)continue;const t=fm(l.p);
+  if(tab==='painel'){for(const c of ALL()){const l=live[c.sym];if(!l)continue;const t=fm(l.p);
       document.querySelectorAll(`[data-px="${c.sym}"]`).forEach(e=>{if(e.textContent!==t){e.textContent=t;e.classList.remove('flash');void e.offsetWidth;e.classList.add('flash');}});
       document.querySelectorAll(`[data-ch="${c.sym}"]`).forEach(h=>{h.textContent=pc(l.ch,2);h.className=cl(l.ch);});}renderKpis();renderResumo();}
   else if(tab==='moeda'){const e=$('#heroP');if(e)e.textContent=fm(price(sel));}
@@ -815,7 +887,7 @@ function renderAcct(){const el=$('#acct');if(!el)return;
     html+=`<h3 style="margin-top:14px">Operação real ${V.type==='ed'?'':'<span class="val no">chave só de leitura</span>'}</h3>`;
     if(ord)html+=`<div class="warnbox"><b>Revise:</b> ${ord.desc}.<br>Ordem a mercado: o preço final pode variar um pouco, e a Binance cobra a taxa dela. <b>Dinheiro real.</b>
       <div class="row" style="margin-top:8px"><button onclick="oTest()">1. Testar sem executar</button><button class="pri" onclick="oSend()" ${ord.tested&&!ord.sending?'':'disabled style="opacity:.45"'}>2. Confirmar ordem REAL</button><button onclick="oCancel()">Cancelar</button></div></div>`;
-    else html+=`<div class="row"><select id="oSym">${COINS.map(c=>`<option ${c.sym===(oF?.sym||sel)?'selected':''}>${c.sym}</option>`).join('')}</select><select id="oSide" onchange="oSideCh()"><option value="BUY">Comprar</option><option value="SELL" ${oF?.side==='SELL'?'selected':''}>Vender</option></select>
+    else html+=`<div class="row"><select id="oSym">${ALL().map(c=>`<option ${c.sym===(oF?.sym||sel)?'selected':''}>${c.sym}</option>`).join('')}</select><select id="oSide" onchange="oSideCh()"><option value="BUY">Comprar</option><option value="SELL" ${oF?.side==='SELL'?'selected':''}>Vender</option></select>
       <label class="note"><span id="oUnit">${oF?.side==='SELL'?'% do saldo da moeda':'Valor em USDT'}</span> <input id="oAmt" type="number" min="0" step="any" value="${oF?.amt||10}" style="width:100px"></label><button class="pri" onclick="oReview()">Revisar ordem</button></div>`;
     html+=`<p class="note">${ordMsg}</p>`;
     if(realLog.length)html+=`<h3>Ordens reais enviadas por este aparelho</h3><div class="tw"><table><thead><tr><th>Quando</th><th>Moeda</th><th>Lado</th><th>Quantidade</th><th>Total (USDT)</th><th>Preço médio</th></tr></thead><tbody>`+[...realLog].reverse().slice(0,20).map(x=>`<tr><td>${dt(x.t,true)}</td><td><b>${x.sym}</b></td><td><span class="sig ${x.side==='BUY'?'BUY':'SELL'}">${x.side==='BUY'?'COMPRA':'VENDA'}</span></td><td>${x.q}</td><td>${x.c.toFixed(2)}</td><td>${x.px?fm(x.px):'—'}</td></tr>`).join('')+'</tbody></table></div>';}
@@ -832,6 +904,10 @@ $('#mkCode').onclick=async()=>{logEv('Carteira','Código de transferência da ca
 $('#useCode').onclick=()=>unpack($('#syncTxt').value);
 $('#expFile').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([pack()],{type:'application/json'}));a.download='cripto-pro-carteira.json';a.click();};
 $('#impFile').onchange=e=>{const f=e.target.files[0];if(f)f.text().then(unpack);};
+let botSub=db.get('botsub','equipe');
+function showSub(s){botSub=s;db.set('botsub',s);document.querySelectorAll('#botSeg button').forEach(b=>b.classList.toggle('on',b.dataset.s===s));document.querySelectorAll('#t-bot .sub').forEach(x=>x.classList.toggle('on',x.id==='s-'+s));}
+document.querySelectorAll('#botSeg button').forEach(b=>b.onclick=()=>showSub(b.dataset.s));showSub(botSub);
+window.goTeam=()=>{showSub('equipe');show('bot');};
 $('#botBtn').onclick=()=>{bot.on=!bot.on;logEv('Bot',bot.on?'Bot deste aparelho LIGADO · '+pTxt(presetOf()):'Bot deste aparelho DESLIGADO');db.set('bot',bot);if(bot.on)botTick();renderBot();};
 $('#botFrac').onchange=e=>{fleetInit=false;logEv('Ajustes','Bot: valor por operação alterado para '+e.target.selectedOptions[0].textContent);bot.frac=+e.target.value;db.set('bot',bot);renderBot();};
 $('#botMax').onchange=e=>{fleetInit=false;logEv('Ajustes','Bot: máx. de moedas alterado para '+e.target.selectedOptions[0].textContent);bot.max=+e.target.value;db.set('bot',bot);renderBot();};
@@ -889,7 +965,7 @@ if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.
 let deferred;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('#inst').style.display='inline-block';});
 $('#inst').onclick=async()=>{if(!deferred)return;deferred.prompt();await deferred.userChoice;deferred=null;$('#inst').style.display='none';};
 let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(tab==='moeda')renderMoeda();},250);});
-logEv('Sistema',`App aberto · versão ${APP_VERSION} · aparelho ${dev.id}`);loadAll();connectWS();loadFng();
+logEv('Sistema',`App aberto · versão ${APP_VERSION} · aparelho ${dev.id}`);Promise.race([loadSrv(),new Promise(r=>setTimeout(r,2500))]).finally(()=>{loadAll();connectWS();});loadFng();
 setInterval(loadAll,15*60*1000);
 </script>
 </body>

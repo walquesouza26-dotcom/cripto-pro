@@ -181,12 +181,15 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
   <div class="warnbox"><b>Simulação.</b> O bot decide sozinho e opera na carteira simulada com os preços reais ao vivo, como se estivesse na sua conta — mas <b>nenhuma ordem real é enviada</b> à Binance. Ele trabalha enquanto o app está aberto.</div>
   <div class="panel"><h2>Bots em segundo plano <span class="sig WAIT" id="srvState">—</span></h2>
     <div class="note" id="srvInfo">Carregando…</div>
-    <div class="tw" style="margin-top:10px"><table><thead><tr><th>Bot</th><th>Estado</th><th>Valor</th><th>Operações</th><th>Encerradas</th><th>Abertas</th><th>Preset</th></tr></thead><tbody id="srvK"></tbody></table></div>
+    <div id="tioBox" style="margin-top:10px"></div>
+    <h3 style="margin-top:12px">Ranking da equipe</h3>
+    <div class="tw"><table><thead><tr><th>#</th><th>Bot</th><th>Estado</th><th>Resultado</th><th>Em negociação</th><th>Recolhido</th><th>Encerradas</th><th>Abertas</th><th>Preset</th></tr></thead><tbody id="srvK"></tbody></table></div>
+    <p class="note">Resultado = o que o bot tem em negociação + o que o TioPatinhas já recolheu dele − R$ 1.000 iniciais, sem o efeito do dólar. Ordenado do melhor para o pior.</p>
     <h3 style="margin-top:12px">Posições abertas</h3>
     <div class="tw"><table><thead><tr><th>Bot</th><th>Moeda</th><th>Compra</th><th>Preço na checagem</th><th>Resultado</th><th>Alvo / limite</th></tr></thead><tbody id="srvPos"></tbody></table></div>
     <h3 style="margin-top:12px">Diário em segundo plano</h3>
     <div class="tw"><table><thead><tr><th>Quando</th><th>Bot</th><th>Moeda</th><th>Ação</th><th>Preço</th><th>Resultado</th><th>Motivo</th></tr></thead><tbody id="srvLog"></tbody></table></div>
-    <p class="note">Estes bots são autônomos: rodam sozinhos nos servidores do GitHub, com o app fechado, cada um com o seu preset e a sua carteira simulada de R$ 1.000. Nenhuma ordem real é enviada. Para ligar, desligar, mudar um preset ou criar outro bot, edite o arquivo <b>bot/config.json</b> no repositório.</p></div>
+    <p class="note">Estes bots são autônomos: rodam sozinhos nos servidores do GitHub, com o app fechado, cada um com o seu preset e a sua carteira simulada de R$ 1.000. O TioPatinhas recolhe para o cofre o lucro realizado de cada bot quando ele passa de 1% do capital. Nenhuma ordem real é enviada. Para ligar, desligar, mudar um preset ou criar outro bot, edite o arquivo <b>bot/config.json</b> no repositório.</p></div>
   <div class="panel">
     <div class="row" style="justify-content:space-between"><div><h2 style="margin:0">Bot neste aparelho <span class="sig WAIT" id="botState">DESLIGADO</span></h2><div class="note" id="botInfo"></div></div><button class="pri" id="botBtn">Ligar bot</button></div>
     <div class="row" style="margin-top:10px">
@@ -276,7 +279,7 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
 </div>
 
 <script>
-const APP_VERSION='1.3.0';document.getElementById('appVer').textContent=APP_VERSION;
+const APP_VERSION='1.4.0';document.getElementById('appVer').textContent=APP_VERSION;
 //<core>
 const COINS=[['BTC','Bitcoin'],['ETH','Ethereum'],['XRP','XRP'],['BNB','BNB'],['SOL','Solana'],['TRX','TRON'],['DOGE','Dogecoin'],['ADA','Cardano'],['LINK','Chainlink'],['LTC','Litecoin'],['AVAX','Avalanche'],['SUI','Sui'],['DOT','Polkadot'],['ZEC','Zcash'],['SHIB','Shiba Inu']].map(([sym,name])=>({sym,name,pair:sym+'USDT'}));
 const FEE=0.001, WARM=200, SPLIT=0.7;
@@ -478,7 +481,8 @@ function renderResumo(){const el=$('#resumo');if(!el||!Object.keys(A).length)ret
   if(man.length)li.push(`<b>Compras manuais simuladas.</b> `+man.map(x=>posLine(x,price(x.sym)||x.price)).join('<br>'));
   const sb=srvBots();if(sb.length){const every=srv.runs>1?(srv.updated-srv.since)/36e5/(srv.runs-1):null;
     li.push(`<b>Bots em segundo plano (autônomos).</b> Última checagem ${ago(srv.updated)}.`+(every&&every>1?` Atenção: o GitHub tem rodado uma checagem a cada ${every.toFixed(1).replace('.',',')} h em média, e não a cada 15 minutos.`:'')+'<br>'+sb.map(b=>{const val=b.value??b.cash,s=fxSplit(b.start,val,b.fx0);
-      return `<b>${esc(b.id)} ${esc(b.name||'')}</b> — ${!b.on?'desligado':b.pos.length?`${b.pos.length} posição(ões)`:'em caixa, esperando gatilho'}; operações ${s.brl?sgn(s.ops,brl):sgn(val-b.start,fm2)}`+(b.closed.length?` em ${b.closed.length} encerrada(s)`:'')+(b.pos.length?'<br>'+b.pos.map(x=>'&nbsp;&nbsp;'+posLine(x,srv.marks?.[x.sym]||x.price)).join('<br>'):'');}).join('<br>'));}
+      return `<b>${esc(b.id)} ${esc(b.name||'')}</b> — ${!b.on?'desligado':b.pos.length?`${b.pos.length} posição(ões)`:'em caixa, esperando gatilho'}; resultado ${bOpsTxt(b)}`+(b.swept?` (${fm2(b.swept)} já no cofre)`:'')+(b.closed.length?` em ${b.closed.length} encerrada(s)`:'')+(b.pos.length?'<br>'+b.pos.map(x=>'&nbsp;&nbsp;'+posLine(x,srv.marks?.[x.sym]||x.price)).join('<br>'):'');}).join('<br>'));
+    if(srv.tio)li.push(tioTxt(true));}
   const v=pfValue(),s=fxSplit(pf.start,v,pf.fx0);
   li.push(`<b>Carteira simulada deste aparelho.</b> Vale ${fm2(v)}. `+(s.brl?`Desde o início: ${sgn(s.ops,brl)} vieram de operações e ${sgn(s.fx,brl)} vieram só da variação do dólar. O saldo simulado é guardado em dólar (USDT), como na Binance; quando o dólar sobe, o valor em reais sobe mesmo sem nenhuma compra ou venda.`:`Resultado das operações desde o início: ${sgn(v-pf.start,fm2)}.`));
   const last=logs.filter(x=>x.c==='Bot'||x.c==='Sinais'||x.c==='Carteira'||x.c==='Ordens reais').slice(-3).reverse();
@@ -579,19 +583,26 @@ function botTick(){if(!bot.on||!Object.keys(A).length)return;let ch=false;bot.la
 const SRV='https://raw.githubusercontent.com/walquesouza26-dotcom/cripto-pro/bot-data/state.json';let srv=null,srvTs=0,srvErr='';
 async function loadSrv(){srvTs=Date.now();try{const r=await fetch(SRV+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error(r.status);srv=await r.json();srvErr='';}catch(e){srvErr=srv?'':'Ainda sem dados: o bot em segundo plano não rodou a primeira vez (ou o agendamento está desativado no GitHub).';}if(tab==='bot')renderSrv();if(tab==='painel')renderResumo();}
 const srvBots=()=>srv?.bots?Object.entries(srv.bots).map(([id,b])=>({id,...b})):[];
+const bVal=b=>b.value??b.cash,bTot=b=>bVal(b)+(b.swept||0),bOps=b=>{const s=fxSplit(b.start,bTot(b),b.fx0);return s.brl?s.ops:bTot(b)-b.start;},bOpsTxt=b=>{const s=fxSplit(b.start,bTot(b),b.fx0);return s.brl?sgn(s.ops,brl):sgn(bTot(b)-b.start,fm2);};
+function tioTxt(short){const t=srv?.tio;if(!t)return'';const bs=srvBots(),n=t.sweeps.length,last=t.sweeps[n-1],ini=bs.reduce((v,b)=>v+b.start,0),neg=bs.reduce((v,b)=>v+bVal(b),0),ops=bs.reduce((v,b)=>v+bOps(b),0);
+  const head=`<b>TioPatinhas</b> ${t.on?'':'(desligado) '}— cofre <b>${fm2(t.vault)}</b> em ${n} recolhimento(s)`+(last?`; último: ${esc(last.bot)} ${fm2(last.amt)} ${ago(last.t)}`:'; ainda nenhum');
+  if(short)return head+'.';
+  return `<div class="card"><div>${head}.</div><div class="s">Regra: recolhe o lucro realizado de cada bot quando ele passa de ${t.pct??1}% do capital do bot (R$ 10 em R$ 1.000). Perdas ficam com o bot, que precisa recuperá-las antes do próximo recolhimento.</div>
+    <div class="s" style="margin-top:6px">Equipe: ${bs.length} bots · capital inicial ${cur==='BRL'&&bs.every(b=>b.fx0)?brl(bs.reduce((v,b)=>v+b.start*b.fx0,0)):fm2(ini)} · em negociação ${fm2(neg)} · no cofre ${fm2(t.vault)} · resultado das operações ${cur==='BRL'?sgn(ops,brl):sgn(ops,fm2)}</div></div>`;}
 function renderSrv(){
   const bs=srvBots();
-  if(!bs.length){$('#srvState').textContent='—';$('#srvInfo').textContent=srvErr||(srv?'Aguardando a primeira checagem dos novos bots.':'Carregando…');$('#srvK').innerHTML='';$('#srvPos').innerHTML='';$('#srvLog').innerHTML='';return;}
+  if(!bs.length){$('#srvState').textContent='—';$('#srvInfo').textContent=srvErr||(srv?'Aguardando a primeira checagem dos novos bots.':'Carregando…');$('#srvK').innerHTML='';$('#tioBox').innerHTML='';$('#srvPos').innerHTML='';$('#srvLog').innerHTML='';return;}
   const age=(Date.now()-srv.updated)/6e4,stale=age>180,anyOn=bs.some(b=>b.on),every=srv.runs>1?(srv.updated-srv.since)/36e5/(srv.runs-1):null;
   $('#srvState').textContent=!anyOn?'DESLIGADOS':stale?'ATRASADO':'RODANDO';$('#srvState').className='sig '+(!anyOn?'WAIT':stale?'WEAK':'BUY');
   $('#srvInfo').textContent=`Última checagem: ${dt(srv.updated,true)} (${ago(srv.updated)}) · ${srv.runs} checagem(ns) desde ${dt(srv.since)}`+(every?` · uma a cada ${every<1?Math.round(every*60)+' min':every.toFixed(1).replace('.',',')+' h'} em média`:'')+(stale?' · o GitHub está atrasando ou pausou o agendamento':'');
   const px=s=>srv.marks?.[s];
-  $('#srvK').innerHTML=bs.map(b=>{const val=b.value??b.cash,w=b.closed.filter(x=>x.pnl>0).length,s=fxSplit(b.start,val,b.fx0);
-    return `<tr><td><b>${esc(b.id)}</b> ${esc(b.name||'')}</td><td>${b.on?'<span class="sig BUY">LIGADO</span>':'<span class="sig WAIT">DESLIGADO</span>'}</td><td>${fm2(val)}</td><td>${s.brl?sgn(s.ops,brl):sgn(val-b.start,fm2)} <span class="mut">(${pc(val/b.start-1,2)})</span></td><td>${b.closed.length?`${b.closed.length} · ${pcn(w/b.closed.length)} acerto`:'nenhuma'}</td><td>${b.pos.length} de ${b.cfg?.max??'—'}</td><td style="white-space:normal;min-width:210px;text-align:left">${b.cfg?pTxt(b.cfg):'—'}</td></tr>`;}).join('');
+  $('#tioBox').innerHTML=tioTxt();
+  $('#srvK').innerHTML=[...bs].sort((a,c)=>bTot(c)/c.start-bTot(a)/a.start).map((b,i)=>{const w=b.closed.filter(x=>x.pnl>0).length;
+    return `<tr><td>${i+1}º</td><td><b>${esc(b.id)}</b> ${esc(b.name||'')}</td><td>${b.on?'<span class="sig BUY">LIGADO</span>':'<span class="sig WAIT">DESLIGADO</span>'}</td><td>${bOpsTxt(b)} <span class="mut">(${pc(bTot(b)/b.start-1,2)})</span></td><td>${fm2(bVal(b))}</td><td>${b.swept?fm2(b.swept):'—'}</td><td>${b.closed.length?`${b.closed.length} · ${pcn(w/b.closed.length)} acerto`:'nenhuma'}</td><td>${b.pos.length} de ${b.cfg?.max??'—'}</td><td style="white-space:normal;min-width:210px;text-align:left">${b.cfg?pTxt(b.cfg):'—'}</td></tr>`;}).join('');
   const pos=bs.flatMap(b=>b.pos.map(x=>({b,x})));
   $('#srvPos').innerHTML=pos.length?pos.map(({b,x})=>{const p=px(x.sym)||x.price,r=x.qty*p*(1-FEE)/x.cost-1;return `<tr class="click" onclick="pick('${x.sym}')"><td><b>${esc(b.id)}</b></td><td><b>${x.sym}</b> <span class="mut">${dt(x.t)}</span></td><td>${fm(x.price)}</td><td>${fm(p)}</td><td class="${cl_(r)}">${pc(r,2)}</td><td><span class="up">${pc(x.tp)}</span> / <span class="dn">−${pcn(x.sl,1)}</span></td></tr>`;}).join(''):'<tr><td colspan="6" class="mut" style="text-align:center">Nenhuma posição aberta: sem gatilho de compra validado, os bots ficam em caixa.</td></tr>';
   const lg=bs.flatMap(b=>b.log.map(x=>({b,x}))).sort((a,c)=>c.x.t-a.x.t).slice(0,60);
-  $('#srvLog').innerHTML=lg.length?lg.map(({b,x})=>`<tr><td>${dt(x.t,true)}</td><td><b>${esc(b.id)}</b></td><td><b>${x.sym}</b></td><td><span class="sig ${x.act==='COMPRA'?'BUY':'SELL'}">${x.act}</span></td><td>${fm(x.p)}</td><td class="${cl_(x.r)}">${x.r==null?'—':pc(x.r,2)}</td><td style="white-space:normal;min-width:180px;text-align:left">${x.why}</td></tr>`).join(''):'<tr><td colspan="7" class="mut" style="text-align:center">Ainda sem decisões.</td></tr>';
+  $('#srvLog').innerHTML=lg.length?lg.map(({b,x})=>`<tr><td>${dt(x.t,true)}</td><td><b>${esc(b.id)}</b></td><td><b>${x.sym}</b></td><td><span class="sig ${x.act==='COMPRA'?'BUY':x.act==='RECOLHE'?'HOLD':'SELL'}">${x.act}</span></td><td>${x.act==='RECOLHE'?fm2(x.p):fm(x.p)}</td><td class="${cl_(x.r)}">${x.r==null?'—':pc(x.r,2)}</td><td style="white-space:normal;min-width:180px;text-align:left">${x.why}</td></tr>`).join(''):'<tr><td colspan="7" class="mut" style="text-align:center">Ainda sem decisões.</td></tr>';
 }
 function renderBot(){renderSrv();if(Date.now()-srvTs>120000)loadSrv();
   $('#botState').textContent=bot.on?'LIGADO':'DESLIGADO';$('#botState').className='sig '+(bot.on?'BUY':'WAIT');$('#botBtn').textContent=bot.on?'Desligar bot':'Ligar bot';$('#botBtn').className=bot.on?'dan':'pri';
@@ -807,8 +818,9 @@ function renderFleet(){
   if(!fleetInit){fleetInit=true;$('#fFrac').value=String(bot.frac);$('#fMax').value=String(bot.max);$('#fTp').value=String(bot.tpM);$('#fSl').value=String(bot.slM);$('#fEntry').value=bot.entry;}
   const res=(v,start)=>`<span class="${cl_(v)}">${fm2(v)}</span>${start?` <span class="mut">(${pc(v/start,2)})</span>`:''}`,ops=(n,w)=>n?`${n} · ${pcn(w/n)} acerto`:'nenhuma';
   const s=botStats();let rows=`<tr><td><b>${esc(me.id)}</b> ${esc(me.name)}</td><td>Este aparelho ${bot.on?'<span class="sig BUY">LIGADO</span>':'<span class="sig WAIT">DESLIGADO</span>'}</td><td style="white-space:normal;min-width:200px">${pTxt(presetOf())}</td><td>${res(s.real+s.un,s.start)}</td><td>${ops(s.n,s.wins)} · ${s.open} aberta(s)</td><td>agora</td><td></td></tr>`;
-  rows+=srvBots().map(b=>{const val=b.value??b.cash,w=b.closed.filter(x=>x.pnl>0).length;
-    return `<tr><td><b>${esc(b.id)}</b> ${esc(b.name||'')}</td><td>Servidor (GitHub) ${b.on?'<span class="sig BUY">LIGADO</span>':'<span class="sig WAIT">DESLIGADO</span>'}</td><td style="white-space:normal;min-width:200px">${b.cfg?pTxt(b.cfg):'—'}</td><td>${res(val-b.start,b.start)}</td><td>${ops(b.closed.length,w)} · ${b.pos.length} aberta(s)</td><td>${dt(srv.updated,true)}</td><td></td></tr>`;}).join('');
+  rows+=srvBots().map(b=>{const w=b.closed.filter(x=>x.pnl>0).length;
+    return `<tr><td><b>${esc(b.id)}</b> ${esc(b.name||'')}</td><td>Servidor (GitHub) ${b.on?'<span class="sig BUY">LIGADO</span>':'<span class="sig WAIT">DESLIGADO</span>'}</td><td style="white-space:normal;min-width:200px">${b.cfg?pTxt(b.cfg):'—'}</td><td>${bOpsTxt(b)} <span class="mut">(${pc(bTot(b)/b.start-1,2)})</span></td><td>${ops(b.closed.length,w)} · ${b.pos.length} aberta(s)</td><td>${dt(srv.updated,true)}</td><td></td></tr>`;}).join('');
+  if(srv?.tio)rows+=`<tr><td><b>TioPatinhas</b></td><td>Servidor (GitHub) ${srv.tio.on?'<span class="sig BUY">LIGADO</span>':'<span class="sig WAIT">DESLIGADO</span>'}</td><td style="white-space:normal;min-width:200px">Recolhe o lucro de cada bot a cada ${srv.tio.pct??1}% do capital</td><td>Cofre ${fm2(srv.tio.vault)}</td><td>${srv.tio.sweeps.length} recolhimento(s)</td><td>${dt(srv.updated,true)}</td><td></td></tr>`;
   if(me.master)rows+=fleet.bots.map((b,i)=>{const r=b.rep;return `<tr><td><b>${esc(b.id)}</b> ${esc(b.name)}</td><td>${esc(b.dev)} ${r?(r.on?'<span class="sig BUY">LIGADO</span>':'<span class="sig WAIT">DESLIGADO</span>'):''}</td><td style="white-space:normal;min-width:200px">${pTxt(b.preset)}</td><td>${r?res(r.real+r.un,r.start):'<span class="mut">aguardando relatório</span>'}</td><td>${r?ops(r.n,r.wins)+` · ${r.open} aberta(s)`:'—'}</td><td>${r?dt(r.t,true):'—'}</td><td><button onclick="fleetKey(${i})">Chave</button> <button class="dan" onclick="fleetDel(${i})">${fleetAsk===i?'Confirmar':'Remover'}</button></td></tr>`;}).join('');
   $('#fleetBody').innerHTML=rows;}
 window.fleetKey=i=>{$('#fKey').value=keyOf(fleet.bots[i]);$('#fMsg').textContent=`Chave do ${fleet.bots[i].id} exibida abaixo.`;};

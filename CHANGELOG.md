@@ -2,6 +2,13 @@
 
 Formato: MAIOR.MENOR.CORREÇÃO — MAIOR em reformulações grandes, MENOR quando entra função nova, CORREÇÃO em ajustes.
 
+## 1.4.0 — 2026-11-19
+- Equipe de 8 bots autônomos em segundo plano, cada um com R$ 1.000 simulados e preset diferente: entram BG04 Caçador 4h, BG05 Concentrado, BG06 Diversificado, BG07 Agressivo e BG08 Corta-perda
+- Novo TioPatinhas: recolhe para um cofre o lucro realizado de cada bot quando passa de 1% do capital do bot
+- Ranking da equipe na aba Bot (resultado = em negociação + recolhido − capital inicial)
+- Correção: o arquivo do modo offline (sw.js) estava vazio desde 13/11; restaurado, e agora o app busca a versão mais nova antes de usar a cópia guardada
+- Alvo de lucro e limite de perda passam a ser conferidos hora a hora desde a última checagem, para o teste não depender do intervalo irregular do GitHub
+
 ## 1.3.0 — 2026-11-16
 - Bots autônomos em segundo plano: agora são vários (BG01 Conservador, BG02 Micro lucro, BG03 Paciente), cada um com preset e carteira simulada próprios, inclusive no período de 4 horas
 - Aba Bot, Central de bots e Resumo ao vivo mostram todos eles lado a lado, sem precisar colar relatório

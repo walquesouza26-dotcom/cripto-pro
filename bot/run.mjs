@@ -14,6 +14,8 @@
 //   do melhor e recomeça com R$ 1.000; o histórico anterior fica arquivado.
 // Custos: taxa de 0,1% + perda estimada entre compra e venda, por moeda (COST no motor).
 // Alvo e limite de perda são conferidos vela a vela de 1 hora desde a última checagem.
+// Universos: "principais" (as 15 moedas do app, padrão) ou "altcoins" (lista de candidatas no config, filtrada
+//   a cada checagem na Binance: precisa de par em USDT, volume mínimo em 24h e histórico mínimo; custo maior).
 // Avisos: se existirem os segredos NTFY_TOPIC e/ou TELEGRAM_TOKEN + TELEGRAM_CHAT_ID, envia as decisões ao celular.
 import fs from 'fs';
 import path from 'path';
@@ -22,7 +24,7 @@ const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const core = html.split('//<core>')[1].split('//</core>')[0];
 const { COINS, COST, analyze, profile, mean, btcRegime } = new Function(core + ';return {COINS,COST,analyze,profile,mean,btcRegime};')();
 const cfg = JSON.parse(fs.readFileSync(new URL('./config.json', import.meta.url), 'utf8'));
-const BOTS = (cfg.bots || []).filter(b => /^BG\d{2}$/.test(b.id)).slice(0, 8);
+const BOTS = (cfg.bots || []).filter(b => /^BG\d{2}$/.test(b.id)).slice(0, 12);
 const PROT = Object.assign({ filtroMercado: true, freioPerdaPercentual: 5, pausaDoFreioDias: 7 }, cfg.protecoes || {});
 const READY = Object.assign({ minimoOperacoes: 30, quedaMaximaPercentual: 5 }, cfg.prontoParaReal || {});
 const EVO = Object.assign({ ligado: true, minimoOperacoes: 20, intervaloDias: 7, diferencaMinimaPercentual: 2 }, cfg.selecaoAutomatica || {});
@@ -52,20 +54,42 @@ if (!st.evo) st.evo = { last: now, gen: 0, overrides: {}, history: [] };
 const presetOf = b => Object.assign({ periodo: '1d', percentualPorOperacao: 20, maximoDeMoedas: 5, alvo: 1, perda: 1, entrada: 'ampla' },
   b, st.evo.overrides[b.id] || {});
 
-async function klines(interval) {
+// universo de altcoins menores (teste): custo por lado maior, porque são menos negociadas
+const ALT = Object.assign({ candidatas: [], volumeMinimoUSD: 10e6, historicoMinimoDias: 365, custoPorLado: 0.0025 }, cfg.universos?.altcoins || {});
+const altBots = BOTS.filter(b => b.universo === 'altcoins');
+const ALTSET = new Set();
+const CF = s => ALTSET.has(s) ? ALT.custoPorLado : COST(s);
+
+async function kl(sym, interval) {
+  const raw = await api(`/api/v3/klines?symbol=${sym}USDT&interval=${interval}&limit=1000`);
+  const closed = raw.filter(k => k[6] < now);
+  return { t: closed.map(k => k[0]), h: closed.map(k => +k[2]), l: closed.map(k => +k[3]), c: closed.map(k => +k[4]), last: +raw[raw.length - 1][4] };
+}
+async function klines(interval, syms) {
   const K = {};
-  for (const c of COINS) {
-    try {
-      const raw = await api(`/api/v3/klines?symbol=${c.pair}&interval=${interval}&limit=1000`);
-      const closed = raw.filter(k => k[6] < now);
-      K[c.sym] = { t: closed.map(k => k[0]), h: closed.map(k => +k[2]), l: closed.map(k => +k[3]), c: closed.map(k => +k[4]), last: +raw[raw.length - 1][4] };
-    } catch (e) { console.warn('falhou', interval, c.sym, String(e.message || e)); }
-  }
+  for (const sym of syms) { try { K[sym] = await kl(sym, interval); } catch (e) { console.warn('falhou', interval, sym, String(e.message || e)); } }
   return K;
 }
 const TFS = [...new Set(['1d', '4h', ...BOTS.map(b => presetOf(b).periodo === '4h' ? '4h' : '1d')])];
 const DATA = {};
-for (const tf of TFS) DATA[tf] = await klines(tf);
+for (const tf of TFS) DATA[tf] = await klines(tf, COINS.map(c => c.sym));
+
+// seleção das altcoins: par em USDT na Binance, volume mínimo e histórico mínimo
+const altInfo = { eligible: [], rejected: [] };
+if (altBots.length) {
+  const main = new Set(COINS.map(c => c.sym)), altTFs = [...new Set(altBots.map(b => presetOf(b).periodo === '4h' ? '4h' : '1d'))];
+  for (const sym of [...new Set(ALT.candidatas.map(x => String(x).toUpperCase().trim()))]) {
+    if (main.has(sym)) { altInfo.rejected.push({ sym, why: 'já está entre as principais' }); continue; }
+    let t24; try { t24 = await api(`/api/v3/ticker/24hr?symbol=${sym}USDT`); } catch (e) { altInfo.rejected.push({ sym, why: 'não encontrada na Binance (par em USDT)' }); continue; }
+    const vol = +t24.quoteVolume;
+    if (!(vol >= ALT.volumeMinimoUSD)) { altInfo.rejected.push({ sym, why: `volume em 24h de US$ ${(vol / 1e6).toFixed(1).replace('.', ',')} milhões (mínimo ${(ALT.volumeMinimoUSD / 1e6).toFixed(0)} milhões)`, vol }); continue; }
+    let day; try { day = await kl(sym, '1d'); } catch (e) { altInfo.rejected.push({ sym, why: 'falha ao baixar o histórico' }); continue; }
+    if (day.c.length < ALT.historicoMinimoDias) { altInfo.rejected.push({ sym, why: `só ${day.c.length} dias de histórico (mínimo ${ALT.historicoMinimoDias})`, vol }); continue; }
+    DATA['1d'][sym] = day;
+    if (altTFs.includes('4h')) { try { DATA['4h'][sym] = await kl(sym, '4h'); } catch (e) {} }
+    ALTSET.add(sym); altInfo.eligible.push({ sym, vol, days: day.c.length });
+  }
+}
 if (!Object.keys(DATA['1d']).length || !DATA['1d'].BTC) { console.error('Sem dados da Binance; estado mantido.'); process.exit(1); }
 let usdbrl = st.usdbrl || 5.5;
 try { usdbrl = +(await api('/api/v3/ticker/price?symbol=USDTBRL')).price; } catch (e) {}
@@ -81,14 +105,16 @@ st.market = { ok: regime.ok, price: regime.price, ma: regime.ma, t: now };
 const AN = {};
 for (const tf of TFS) {
   AN[tf] = {};
-  for (const c of COINS) {
-    const d = DATA[tf][c.sym], day = DATA['1d'][c.sym]; if (!d || !day) continue;
-    const a = analyze(d, tf === '1d' ? 1 : 6, tf === '1d' ? 2 : 3, COST(c.sym)); if (!a) continue;
+  for (const sym of Object.keys(DATA[tf])) {
+    const d = DATA[tf][sym], day = DATA['1d'][sym]; if (!d || !day) continue;
+    const a = analyze(d, tf === '1d' ? 1 : 6, tf === '1d' ? 2 : 3, CF(sym)); if (!a) continue;
     const vol = profile(day, null).vol, cl = a.full.trades.filter(t => !t.open), w = cl.filter(t => t.r > 0).map(t => t.r), l = cl.filter(t => t.r <= 0).map(t => -t.r);
-    AN[tf][c.sym] = { a, d, gain: w.length >= 2 ? mean(w) : vol, loss: l.length >= 2 ? mean(l) : vol };
+    AN[tf][sym] = { a, d, gain: w.length >= 2 ? mean(w) : vol, loss: l.length >= 2 ? mean(l) : vol };
   }
 }
 st.validated = Object.fromEntries(TFS.map(tf => [tf, COINS.filter(c => AN[tf][c.sym]?.a.valid).map(c => c.sym)]));
+if (altBots.length) st.universes = { altcoins: { ...altInfo, validated: altInfo.eligible.filter(x => AN['1d'][x.sym]?.a.valid).map(x => x.sym), rules: { volumeMinimoUSD: ALT.volumeMinimoUSD, historicoMinimoDias: ALT.historicoMinimoDias, custoPorLado: ALT.custoPorLado }, t: now } };
+else delete st.universes;
 
 // velas de 1 hora das moedas com posição aberta, para conferir alvo e perda desde a última checagem
 const H = {};
@@ -110,6 +136,8 @@ for (const b of BOTS) {
   const P = presetOf(b);
   const tf = P.periodo === '4h' ? '4h' : '1d', tpM = +P.alvo || 1, slM = +P.perda || 1, frac = (+P.percentualPorOperacao || 20) / 100, max = +P.maximoDeMoedas || 5, onlyNew = P.entrada === 'gatilho';
   const useFilter = PROT.filtroMercado && b.filtroMercado !== false;
+  const uni = b.universo === 'altcoins' ? 'altcoins' : 'principais';
+  const UC = (uni === 'altcoins' ? altInfo.eligible.map(x => x.sym) : COINS.map(c => c.sym)).map(sym => ({ sym }));
   let s = st.bots[b.id];
   if (!s) s = st.bots[b.id] = newWallet();
   s.swept = s.swept || 0;
@@ -117,7 +145,7 @@ for (const b of BOTS) {
   if (s.peak == null) { s.peak = s.start; s.maxDD = 0; }
   if (s.brakeBase == null) s.brakeBase = s.start;
   const log = (sym, act, why, p, r, t = now) => { s.log.push({ t, sym, act, why, p, r }); if (s.log.length > 200) s.log = s.log.slice(-200); events.push({ t, bot: b.id, name: P.nome || b.id, sym, act, why, p, r }); };
-  const sell = (i, p, why, t = now) => { const x = s.pos[i], got = x.qty * p * (1 - COST(x.sym)); s.cash += got; s.closed.push({ sym: x.sym, tin: x.t, tout: t, pin: x.price, pout: p, pnl: got - x.cost, cost: x.cost }); s.pos.splice(i, 1); log(x.sym, 'VENDA', why, p, got / x.cost - 1, t); };
+  const sell = (i, p, why, t = now) => { const x = s.pos[i], got = x.qty * p * (1 - CF(x.sym)); s.cash += got; s.closed.push({ sym: x.sym, tin: x.t, tout: t, pin: x.price, pout: p, pnl: got - x.cost, cost: x.cost }); s.pos.splice(i, 1); log(x.sym, 'VENDA', why, p, got / x.cost - 1, t); };
   const value = () => s.cash + s.pos.reduce((v, x) => v + x.qty * (price(x.sym) || x.price), 0);
   const X = AN[tf];
   s.blocked = null;
@@ -125,7 +153,7 @@ for (const b of BOTS) {
     // 1) alvo/perda hora a hora desde a última checagem (na mesma hora, a perda conta primeiro: mais conservador)
     for (let i = s.pos.length - 1; i >= 0; i--) {
       const x = s.pos[i], hs = H[x.sym]; if (!hs) continue;
-      const k1 = 1 - COST(x.sym), pTp = (1 + x.tp) * x.cost / (x.qty * k1), pSl = (1 - x.sl) * x.cost / (x.qty * k1);
+      const k1 = 1 - CF(x.sym), pTp = (1 + x.tp) * x.cost / (x.qty * k1), pSl = (1 - x.sl) * x.cost / (x.qty * k1);
       for (const k of hs) {
         if (k.t < (x.chk || x.t)) continue;
         if (k.l <= pSl) { sell(i, Math.min(pSl, k.o), `Limite de perda atingido (${pct(-x.sl)}) às ${fmtH(k.t)}`, k.end); break; }
@@ -135,7 +163,7 @@ for (const b of BOTS) {
     // 2) alvo/perda pelo preço de agora e saída pela regra
     for (let i = s.pos.length - 1; i >= 0; i--) {
       const x = s.pos[i], p = price(x.sym), a = X[x.sym]?.a; if (!p) continue;
-      const r = x.qty * p * (1 - COST(x.sym)) / x.cost - 1;
+      const r = x.qty * p * (1 - CF(x.sym)) / x.cost - 1;
       const why = r >= x.tp ? `Alvo de lucro atingido (${pct(x.tp)})` : r <= -x.sl ? `Limite de perda atingido (${pct(-x.sl)})` : (a && (a.sig === 'SELL' || a.sig === 'WAIT')) ? 'A regra da moeda deu saída' : null;
       if (why) sell(i, p, why); else x.chk = now;
     }
@@ -162,7 +190,7 @@ for (const b of BOTS) {
     if (s.paused) s.blocked = `Freio por perda: compras pausadas até ${fmtH(s.paused.until)}`;
     else if (useFilter && !regime.ok) s.blocked = 'Filtro de mercado: Bitcoin abaixo da média de 200 dias';
     else {
-      const cand = COINS.map(c => {
+      const cand = UC.map(c => {
         const e = X[c.sym]; if (!e || !e.a.valid) return null; const { a, d } = e, p = price(c.sym);
         const tp = clamp(e.gain * tpM, 0.003, 0.3), sl = clamp(e.loss * slM, 0.005, 0.3);
         if (a.sig !== 'BUY' && !(!onlyNew && a.sig === 'HOLD' && p <= d.c[a.k] * (1 + tp / 2))) return null;
@@ -172,7 +200,7 @@ for (const b of BOTS) {
       for (const k of cand) {
         if (s.pos.length >= max) break;
         const amt = Math.min(s.cash, value() * frac); if (amt < 5) break;
-        s.cash -= amt; s.pos.push({ sym: k.c.sym, qty: amt * (1 - COST(k.c.sym)) / k.p, price: k.p, cost: amt, t: now, tp: k.tp, sl: k.sl }); s.done[k.c.sym] = k.d.t[k.a.k];
+        s.cash -= amt; s.pos.push({ sym: k.c.sym, qty: amt * (1 - CF(k.c.sym)) / k.p, price: k.p, cost: amt, t: now, tp: k.tp, sl: k.sl }); s.done[k.c.sym] = k.d.t[k.a.k];
         log(k.c.sym, 'COMPRA', (k.a.sig === 'BUY' ? 'Gatilho de compra validado' : 'Regra comprada e preço ainda perto da entrada') + ' · ' + k.a.best.s.name, k.p, null);
       }
     }
@@ -193,9 +221,9 @@ for (const b of BOTS) {
   ];
   s.ready = { ok: checks.every(c => c.ok), checks };
   s.name = String(P.nome || b.id).slice(0, 40); s.on = !!b.ligado; s.filter = useFilter;
-  s.cfg = { frac, max, tpM, slM, entry: onlyNew ? 'BUY' : 'ALL', tf };
+  s.cfg = { frac, max, tpM, slM, entry: onlyNew ? 'BUY' : 'ALL', tf, uni };
   s.evolved = !!st.evo.overrides[b.id];
-  s.buyable = COINS.filter(c => X[c.sym]?.a.valid && (X[c.sym].a.sig === 'BUY' || X[c.sym].a.sig === 'HOLD')).map(c => c.sym);
+  s.buyable = UC.filter(c => X[c.sym]?.a.valid && (X[c.sym].a.sig === 'BUY' || X[c.sym].a.sig === 'HOLD')).map(c => c.sym);
 }
 for (const id of Object.keys(st.bots)) if (!BOTS.some(b => b.id === id)) st.bots[id].on = false; // bot retirado do config: fica guardado, desligado
 
@@ -210,7 +238,7 @@ if (EVO.ligado && now - st.evo.last >= EVO.intervaloDias * DAY) {
     const i = Math.max(0, list.indexOf(bp[key])), j = i + 1 < list.length ? i + 1 : i - 1;
     const np = { periodo: bp.periodo, percentualPorOperacao: bp.percentualPorOperacao, maximoDeMoedas: bp.maximoDeMoedas, alvo: bp.alvo, perda: bp.perda, entrada: bp.entrada, [key]: list[j] };
     const ws = worst.s;
-    for (let k = ws.pos.length - 1; k >= 0; k--) { const x = ws.pos[k], p = price(x.sym) || x.price, got = x.qty * p * (1 - COST(x.sym)); ws.cash += got; ws.closed.push({ sym: x.sym, tin: x.t, tout: now, pin: x.price, pout: p, pnl: got - x.cost, cost: x.cost }); ws.pos.splice(k, 1); }
+    for (let k = ws.pos.length - 1; k >= 0; k--) { const x = ws.pos[k], p = price(x.sym) || x.price, got = x.qty * p * (1 - CF(x.sym)); ws.cash += got; ws.closed.push({ sym: x.sym, tin: x.t, tout: now, pin: x.price, pout: p, pnl: got - x.cost, cost: x.cost }); ws.pos.splice(k, 1); }
     ws.value = ws.cash;
     const { id: _i, nome: _n, ligado: _l, filtroMercado: _f, ...wp } = presetOf(worst.b);
     const arch = { t: now, preset: wp, result: result(ws), n: ws.closed.length, swept: ws.swept };

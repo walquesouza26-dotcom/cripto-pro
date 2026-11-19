@@ -1,5 +1,5 @@
 // Cripto Pro — modo offline. O nome do cache acompanha APP_VERSION do index.html.
-const C = 'cripto-pro-1.5.0';
+const C = 'cripto-pro-1.5.1';
 const SHELL = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {

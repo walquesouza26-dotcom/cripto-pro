@@ -2,6 +2,9 @@
 
 Formato: MAIOR.MENOR.CORREÇÃO — MAIOR em reformulações grandes, MENOR quando entra função nova, CORREÇÃO em ajustes.
 
+## 1.5.1 — 2026-11-19
+- Ranking: a coluna “Em negociação” passa a se chamar “Saldo do bot” e mostra se o dinheiro está todo em caixa ou quanto está aplicado em moedas
+
 ## 1.5.0 — 2026-11-19
 - Referência: cada bot é comparado com “segurar Bitcoin” desde o dia em que começou
 - Selo “Pronto para dinheiro real”: 30 operações encerradas, lucro depois dos custos, ganho maior que segurar Bitcoin e pior queda menor que 5%

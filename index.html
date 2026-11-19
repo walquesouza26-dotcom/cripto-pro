@@ -184,8 +184,8 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
     <div id="srvMkt" class="note" style="margin-top:8px;color:var(--tx2)"></div>
     <div id="tioBox" style="margin-top:10px"></div>
     <h3 style="margin-top:12px">Ranking da equipe</h3>
-    <div class="tw"><table><thead><tr><th>#</th><th>Bot</th><th>Situação</th><th>Resultado</th><th>Segurar BTC</th><th>Pior queda</th><th>Em negociação</th><th>Recolhido</th><th>Encerradas</th><th>Abertas</th><th>Preset</th></tr></thead><tbody id="srvK"></tbody></table></div>
-    <p class="note">Resultado = o que o bot tem em negociação + o que o TioPatinhas já recolheu dele − R$ 1.000 iniciais, sem o efeito do dólar, já descontando taxas e a perda entre preço de compra e de venda. “Segurar BTC” mostra quanto teria rendido só comprar Bitcoin no dia em que o bot começou: é a referência que o bot precisa superar. Ordenado do melhor para o pior.</p>
+    <div class="tw"><table><thead><tr><th>#</th><th>Bot</th><th>Situação</th><th>Resultado</th><th>Segurar BTC</th><th>Pior queda</th><th>Saldo do bot</th><th>Recolhido</th><th>Encerradas</th><th>Abertas</th><th>Preset</th></tr></thead><tbody id="srvK"></tbody></table></div>
+    <p class="note">Saldo do bot = dinheiro em caixa + moedas compradas, a preço de hoje (“todo em caixa” = nenhuma compra aberta). Resultado = saldo + o que o TioPatinhas já recolheu − R$ 1.000 iniciais, sem o efeito do dólar, já descontando taxas e a perda entre preço de compra e de venda. “Segurar BTC” mostra quanto teria rendido só comprar Bitcoin no dia em que o bot começou: é a referência que o bot precisa superar. Ordenado do melhor para o pior.</p>
     <h3 style="margin-top:12px">Pronto para dinheiro real?</h3>
     <div class="tw"><table><thead><tr><th>Bot</th><th>Selo</th><th>Operações</th><th>Lucro</th><th>Melhor que segurar BTC</th><th>Pior queda</th></tr></thead><tbody id="srvReady"></tbody></table></div>
     <p class="note" id="srvReadyNote"></p>
@@ -285,7 +285,7 @@ textarea{width:100%;min-height:70px;font:12px ui-monospace,monospace;color:var(-
 </div>
 
 <script>
-const APP_VERSION='1.5.0';document.getElementById('appVer').textContent=APP_VERSION;
+const APP_VERSION='1.5.1';document.getElementById('appVer').textContent=APP_VERSION;
 //<core>
 const COINS=[['BTC','Bitcoin'],['ETH','Ethereum'],['XRP','XRP'],['BNB','BNB'],['SOL','Solana'],['TRX','TRON'],['DOGE','Dogecoin'],['ADA','Cardano'],['LINK','Chainlink'],['LTC','Litecoin'],['AVAX','Avalanche'],['SUI','Sui'],['DOT','Polkadot'],['ZEC','Zcash'],['SHIB','Shiba Inu']].map(([sym,name])=>({sym,name,pair:sym+'USDT'}));
 const FEE=0.001, WARM=200, SPLIT=0.7;
@@ -610,7 +610,7 @@ function tioTxt(short){const t=srv?.tio;if(!t)return'';const bs=srvBots(),n=t.sw
   const head=`<b>TioPatinhas</b> ${t.on?'':'(desligado) '}— cofre <b>${fm2(t.vault)}</b> em ${n} recolhimento(s)`+(last?`; último: ${esc(last.bot)} ${fm2(last.amt)} ${ago(last.t)}`:'; ainda nenhum');
   if(short)return head+'.';
   return `<div class="card"><div>${head}.</div><div class="s">Regra: recolhe o lucro realizado de cada bot quando ele passa de ${t.pct??1}% do capital do bot (R$ 10 em R$ 1.000). Perdas ficam com o bot, que precisa recuperá-las antes do próximo recolhimento.</div>
-    <div class="s" style="margin-top:6px">Equipe: ${bs.length} bots · capital inicial ${cur==='BRL'&&bs.every(b=>b.fx0)?brl(bs.reduce((v,b)=>v+b.start*b.fx0,0)):fm2(ini)} · em negociação ${fm2(neg)} · no cofre ${fm2(t.vault)} · resultado das operações ${cur==='BRL'?sgn(ops,brl):sgn(ops,fm2)}</div></div>`;}
+    <div class="s" style="margin-top:6px">Equipe: ${bs.length} bots · capital inicial ${cur==='BRL'&&bs.every(b=>b.fx0)?brl(bs.reduce((v,b)=>v+b.start*b.fx0,0)):fm2(ini)} · saldo dos bots ${fm2(neg)} · no cofre ${fm2(t.vault)} · resultado das operações ${cur==='BRL'?sgn(ops,brl):sgn(ops,fm2)}</div></div>`;}
 function renderSrv(){
   const bs=srvBots();
   if(!bs.length){$('#srvState').textContent='—';$('#srvInfo').textContent=srvErr||(srv?'Aguardando a primeira checagem dos novos bots.':'Carregando…');$('#srvK').innerHTML='';$('#tioBox').innerHTML='';$('#srvMkt').innerHTML='';$('#srvReady').innerHTML='';$('#srvPos').innerHTML='';$('#srvLog').innerHTML='';return;}
@@ -620,7 +620,7 @@ function renderSrv(){
   const px=s=>srv.marks?.[s];
   $('#tioBox').innerHTML=tioTxt();
   $('#srvK').innerHTML=[...bs].sort((a,c)=>bTot(c)/c.start-bTot(a)/a.start).map((b,i)=>{const w=b.closed.filter(x=>x.pnl>0).length,r=bTot(b)/b.start-1,bh=b.bench?.ret;
-    return `<tr><td>${i+1}º</td><td><b>${esc(b.id)}</b> ${esc(b.name||'')}${b.evolved?' <span class="val">preset ajustado</span>':''}</td><td>${bState(b)}</td><td>${bOpsTxt(b)} <span class="mut">(${pc(r,2)})</span></td><td class="${cl_(bh)}">${bh==null?'—':pc(bh,2)}</td><td>${b.maxDD!=null?'−'+pcn(b.maxDD,1):'—'}</td><td>${fm2(bVal(b))}</td><td>${b.swept?fm2(b.swept):'—'}</td><td>${b.closed.length?`${b.closed.length} · ${pcn(w/b.closed.length)} acerto`:'nenhuma'}</td><td>${b.pos.length} de ${b.cfg?.max??'—'}</td><td style="white-space:normal;min-width:210px;text-align:left">${b.cfg?pTxt(b.cfg):'—'}</td></tr>`;}).join('');
+    return `<tr><td>${i+1}º</td><td><b>${esc(b.id)}</b> ${esc(b.name||'')}${b.evolved?' <span class="val">preset ajustado</span>':''}</td><td>${bState(b)}</td><td>${bOpsTxt(b)} <span class="mut">(${pc(r,2)})</span></td><td class="${cl_(bh)}">${bh==null?'—':pc(bh,2)}</td><td>${b.maxDD!=null?'−'+pcn(b.maxDD,1):'—'}</td><td>${fm2(bVal(b))} <span class="mut">${b.pos.length?pcn(1-b.cash/bVal(b))+' aplicado':'todo em caixa'}</span></td><td>${b.swept?fm2(b.swept):'—'}</td><td>${b.closed.length?`${b.closed.length} · ${pcn(w/b.closed.length)} acerto`:'nenhuma'}</td><td>${b.pos.length} de ${b.cfg?.max??'—'}</td><td style="white-space:normal;min-width:210px;text-align:left">${b.cfg?pTxt(b.cfg):'—'}</td></tr>`;}).join('');
   const m=srv.market;
   $('#srvMkt').innerHTML=m?`<b>Mercado agora:</b> Bitcoin a ${fm(m.price)}, média de 200 dias ${m.ma?fm(m.ma):'—'} → ${m.ok?'<span class="up">compras liberadas</span>':`<span class="dn">filtro de mercado segurando as compras</span> dos bots com filtro${bs.some(b=>b.filter===false)?` (sem filtro: ${bs.filter(b=>b.filter===false).map(b=>esc(b.id)).join(', ')})`:''}`}.`+
     (srv.validated?` Moedas aprovadas pelo critério agora — diário: ${srv.validated['1d']?.join(', ')||'nenhuma'}; 4 horas: ${srv.validated['4h']?.join(', ')||'nenhuma'}.`:''):'';

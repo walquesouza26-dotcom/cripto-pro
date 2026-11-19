@@ -10,6 +10,9 @@ Outras regras:
 - O motor de análise fica entre `//<core>` e `//</core>` em `index.html`; `bot/run.mjs` lê esse trecho, então mantenha-o sem dependência de DOM.
 - `bot/config.json` lista os bots em segundo plano (ids `BG01`…`BG08`); cada um tem carteira simulada própria no ramo `bot-data` (`state.json`, formato v2). Retirar um bot do config só o desliga; o histórico fica guardado.
 - TioPatinhas (`tioPatinhas` no config, estado em `state.tio`): recolhe o lucro realizado de cada bot ao atingir `gatilhoPercentual`% do capital; `swept` de cada bot guarda o total recolhido. Resultado de um bot = valor + swept − start.
+- Proteções e critérios ficam em `bot/config.json` (`protecoes`, `prontoParaReal`, `selecaoAutomatica`, `avisos`). A seleção automática grava presets ajustados em `state.evo.overrides` (o config continua sendo a base).
+- Custos por moeda: `COST(sym)` no motor (taxa + perda entre compra e venda). Toda conta de dinheiro simulado usa `COST`, não `FEE`.
+- Avisos usam os segredos do repositório `NTFY_TOPIC`, `TELEGRAM_TOKEN` e `TELEGRAM_CHAT_ID` (nunca no código).
 - Os bots são sempre simulados. Ordens reais só pelo fluxo manual da área segura (revisar → testar → confirmar).
 - Nunca gravar chaves, senhas ou tokens no repositório (ele é público).
 - Textos do app e do manual em português do Brasil, para usuário leigo.

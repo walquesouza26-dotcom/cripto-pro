@@ -1,14 +1,18 @@
 {
   "capitalInicialBRL": 1000,
-  "tioPatinhas": { "ligado": true, "gatilhoPercentual": 1 },
+  "tioPatinhas": {"ligado": true, "gatilhoPercentual": 1},
+  "protecoes": {"filtroMercado": true, "freioPerdaPercentual": 5, "pausaDoFreioDias": 7},
+  "prontoParaReal": {"minimoOperacoes": 30, "quedaMaximaPercentual": 5},
+  "selecaoAutomatica": {"ligado": true, "minimoOperacoes": 20, "intervaloDias": 7, "diferencaMinimaPercentual": 2},
+  "avisos": {"resumoDiarioHora": 9},
   "bots": [
-    { "id": "BG01", "nome": "Conservador",      "ligado": true, "periodo": "1d", "percentualPorOperacao": 20, "maximoDeMoedas": 5, "alvo": 1,    "perda": 0.75, "entrada": "gatilho" },
-    { "id": "BG02", "nome": "Micro lucro",      "ligado": true, "periodo": "4h", "percentualPorOperacao": 20, "maximoDeMoedas": 5, "alvo": 0.5,  "perda": 0.5,  "entrada": "ampla" },
-    { "id": "BG03", "nome": "Paciente",         "ligado": true, "periodo": "1d", "percentualPorOperacao": 20, "maximoDeMoedas": 5, "alvo": 1.5,  "perda": 1,    "entrada": "ampla" },
-    { "id": "BG04", "nome": "Caçador 4h",       "ligado": true, "periodo": "4h", "percentualPorOperacao": 25, "maximoDeMoedas": 4, "alvo": 1,    "perda": 1,    "entrada": "gatilho" },
-    { "id": "BG05", "nome": "Concentrado",      "ligado": true, "periodo": "1d", "percentualPorOperacao": 50, "maximoDeMoedas": 2, "alvo": 1,    "perda": 1,    "entrada": "ampla" },
-    { "id": "BG06", "nome": "Diversificado",    "ligado": true, "periodo": "1d", "percentualPorOperacao": 10, "maximoDeMoedas": 8, "alvo": 0.75, "perda": 0.75, "entrada": "ampla" },
-    { "id": "BG07", "nome": "Agressivo",        "ligado": true, "periodo": "4h", "percentualPorOperacao": 33, "maximoDeMoedas": 3, "alvo": 1.5,  "perda": 1.5,  "entrada": "ampla" },
-    { "id": "BG08", "nome": "Corta-perda",      "ligado": true, "periodo": "1d", "percentualPorOperacao": 20, "maximoDeMoedas": 5, "alvo": 0.5,  "perda": 0.5,  "entrada": "gatilho" }
+    {"id": "BG01", "nome": "Conservador", "ligado": true, "periodo": "1d", "percentualPorOperacao": 20, "maximoDeMoedas": 5, "alvo": 1, "perda": 0.75, "entrada": "gatilho"},
+    {"id": "BG02", "nome": "Micro lucro", "ligado": true, "periodo": "4h", "percentualPorOperacao": 20, "maximoDeMoedas": 5, "alvo": 0.5, "perda": 0.5, "entrada": "ampla"},
+    {"id": "BG03", "nome": "Paciente", "ligado": true, "periodo": "1d", "percentualPorOperacao": 20, "maximoDeMoedas": 5, "alvo": 1.5, "perda": 1, "entrada": "ampla"},
+    {"id": "BG04", "nome": "Caçador 4h", "ligado": true, "periodo": "4h", "percentualPorOperacao": 25, "maximoDeMoedas": 4, "alvo": 1, "perda": 1, "entrada": "gatilho"},
+    {"id": "BG05", "nome": "Concentrado", "ligado": true, "periodo": "1d", "percentualPorOperacao": 50, "maximoDeMoedas": 2, "alvo": 1, "perda": 1, "entrada": "ampla"},
+    {"id": "BG06", "nome": "Diversificado", "ligado": true, "periodo": "1d", "percentualPorOperacao": 10, "maximoDeMoedas": 8, "alvo": 0.75, "perda": 0.75, "entrada": "ampla"},
+    {"id": "BG07", "nome": "Agressivo", "ligado": true, "periodo": "4h", "percentualPorOperacao": 33, "maximoDeMoedas": 3, "alvo": 1.5, "perda": 1.5, "entrada": "ampla", "filtroMercado": false},
+    {"id": "BG08", "nome": "Corta-perda", "ligado": true, "periodo": "1d", "percentualPorOperacao": 20, "maximoDeMoedas": 5, "alvo": 0.5, "perda": 0.5, "entrada": "gatilho"}
   ]
 }

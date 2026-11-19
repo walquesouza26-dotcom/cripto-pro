@@ -19,6 +19,10 @@ jobs:
           mkdir -p data
           if git fetch --depth=1 origin bot-data 2>/dev/null; then git show FETCH_HEAD:state.json > data/state.json; fi
       - name: Roda o bot (simulação, sem ordens reais)
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: node bot/run.mjs data/state.json
       - name: Salva o estado
         run: |

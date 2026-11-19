@@ -6,7 +6,7 @@ Formato: MAIOR.MENOR.CORREÇÃO — MAIOR em reformulações grandes, MENOR quan
 - Referência: cada bot é comparado com “segurar Bitcoin” desde o dia em que começou
 - Selo “Pronto para dinheiro real”: 30 operações encerradas, lucro depois dos custos, ganho maior que segurar Bitcoin e pior queda menor que 5%
 - Freio por perda: bot que perde 5% pausa as compras por 7 dias (as vendas continuam)
-- Filtro de mercado: com o Bitcoin abaixo da média de 200 dias, os bots não compram (o BG07 Agressivo fica sem filtro, como comparação)
+- Filtro de mercado: com o Bitcoin abaixo da média de 200 dias, os bots não compram (o BG06 Diversificado fica sem filtro, como comparação)
 - Validação mais rigorosa: a regra precisa de lucro nos 3 períodos do histórico e de pelo menos 3 operações no teste cego
 - Custos realistas: além da taxa de 0,1%, a perda entre preço de compra e de venda (0,05% a 0,15% por lado, conforme a moeda)
 - Seleção automática: a cada 7 dias, o pior bot recebe uma variação do preset do melhor e recomeça com R$ 1.000

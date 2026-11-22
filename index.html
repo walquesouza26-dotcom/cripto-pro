@@ -143,6 +143,8 @@ details.panel[open]>summary{margin-bottom:10px}
   .seg button{padding:9px 6px;font-size:13px}
   .botgrid{grid-template-columns:1fr}
 }
+.grptag{font-size:10px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:5px;text-transform:uppercase}
+.grptag.prot{background:#12314f;color:#8fc1ff}.grptag.exp{background:#40300a;color:#ffd166}
 </style>
 </head>
 <body>
@@ -340,7 +342,7 @@ details.panel[open]>summary{margin-bottom:10px}
 </div>
 
 <script>
-const APP_VERSION='1.7.0';document.getElementById('appVer').textContent=APP_VERSION;
+const APP_VERSION='1.8.0';document.getElementById('appVer').textContent=APP_VERSION;
 //<core>
 const COINS=[['BTC','Bitcoin'],['ETH','Ethereum'],['XRP','XRP'],['BNB','BNB'],['SOL','Solana'],['TRX','TRON'],['DOGE','Dogecoin'],['ADA','Cardano'],['LINK','Chainlink'],['LTC','Litecoin'],['AVAX','Avalanche'],['SUI','Sui'],['DOT','Polkadot'],['ZEC','Zcash'],['SHIB','Shiba Inu']].map(([sym,name])=>({sym,name,pair:sym+'USDT'}));
 const FEE=0.001, WARM=200, SPLIT=0.7;
@@ -686,7 +688,7 @@ function renderSrv(){
   const px=s=>srv.marks?.[s];
   $('#tioBox').innerHTML=tioTxt();
   $('#srvCards').innerHTML=[...bs].sort((a,c)=>bTot(c)/c.start-bTot(a)/a.start).map((b,i)=>{const r=bTot(b)/b.start-1,bh=b.bench?.ret,w=b.closed.filter(x=>x.pnl>0).length;
-    return `<div class="bcard"><div class="bhead"><span class="rank">${i+1}º</span><div style="flex:1;min-width:0"><b>${esc(b.id)}</b> <span class="bname">${esc(b.name||'')}</span></div>${bState(b)}</div>
+    return `<div class="bcard"><div class="bhead"><span class="rank">${i+1}º</span><div style="flex:1;min-width:0"><b>${esc(b.id)}</b> <span class="bname">${esc(b.name||'')}</span><br><span class="grptag ${b.cfg?.filter===false||(b.cfg?.val&&b.cfg.val!=='rigorosa')?'exp':'prot'}">${b.cfg?.filter===false||(b.cfg?.val&&b.cfg.val!=='rigorosa')?'exploração':'protegido'}</span></div>${bState(b)}</div>
       <div class="bres ${Math.abs(r)<5e-5?'':cl_(r)}">${bOpsTxt(b)} <small>${pc(r,2)}</small></div>
       <div class="bline"><span>Saldo ${fm2(bVal(b))}</span><span>${b.pos.length?pcn(1-b.cash/bVal(b))+' aplicado':'todo em caixa'}</span></div>
       <div class="bline"><span>${b.closed.length?`${b.closed.length} encerrada(s) · ${pcn(w/b.closed.length)} acerto`:'nenhuma operação encerrada'}</span><span>${b.pos.length} aberta(s)</span></div>
@@ -918,7 +920,7 @@ $('#botEntry').onchange=e=>{fleetInit=false;logEv('Ajustes','Bot: entrada altera
 // ---- Central de bots: presets, aparelhos registrados e acompanhamento ----
 const e64=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o)))),d64=s=>JSON.parse(decodeURIComponent(escape(atob(s))));
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const pTxt=p=>`${Math.round(p.frac*100)}% por operação · máx. ${p.max} · alvo ×${String(p.tpM).replace('.',',')} · perda ×${String(p.slM).replace('.',',')} · ${p.entry==='BUY'?'só gatilho novo':'gatilho ou perto da entrada'} · ${p.tf==='4h'?'4 horas':'diário'}${p.uni==='altcoins'?' · altcoins menores':''}`;
+const pTxt=p=>`${Math.round(p.frac*100)}% por operação · máx. ${p.max} · alvo ×${String(p.tpM).replace('.',',')} · perda ×${String(p.slM).replace('.',',')} · ${p.entry==='BUY'?'só gatilho novo':'gatilho ou perto da entrada'} · ${p.tf==='4h'?'4 horas':p.tf==='1h'?'1 hora':'diário'}${p.uni==='altcoins'?' · altcoins menores':''}${p.val==='simples'?' · validação simples':p.val==='nenhuma'?' · sem validação':''}${p.filter===false?' · sem filtro de mercado':''}`;
 const presetOf=()=>({frac:bot.frac,max:bot.max,tpM:bot.tpM,slM:bot.slM,entry:bot.entry,tf});
 const okPreset=p=>p&&p.frac>0&&p.frac<=1&&p.max>=1&&p.max<=8&&p.tpM>0&&p.tpM<=3&&p.slM>0&&p.slM<=3&&(p.entry==='BUY'||p.entry==='ALL')&&(p.tf==='1d'||p.tf==='4h');
 function botStats(){const c=pf.closed.filter(x=>x.bot),o=pf.pos.filter(x=>x.bot);return{real:c.reduce((s,x)=>s+x.pnl,0),un:o.reduce((s,x)=>s+x.qty*(price(x.sym)||x.price)*(1-COST(x.sym))-x.cost,0),n:c.length,wins:c.filter(x=>x.pnl>0).length,open:o.length,start:pf.start,on:bot.on};}

@@ -11,14 +11,16 @@
   },
   "bots": [
     {"id": "BG01", "nome": "Conservador", "ligado": true, "periodo": "1d", "percentualPorOperacao": 20, "maximoDeMoedas": 5, "alvo": 1, "perda": 0.75, "entrada": "gatilho"},
-    {"id": "BG02", "nome": "Micro lucro", "ligado": true, "periodo": "4h", "percentualPorOperacao": 20, "maximoDeMoedas": 5, "alvo": 0.5, "perda": 0.5, "entrada": "ampla"},
+    {"id": "BG02", "nome": "Micro lucro 1h", "ligado": true, "periodo": "1h", "validacao": "nenhuma", "percentualPorOperacao": 20, "maximoDeMoedas": 5, "alvo": 0.5, "perda": 0.5, "entrada": "ampla", "filtroMercado": false},
     {"id": "BG03", "nome": "Paciente", "ligado": true, "periodo": "1d", "percentualPorOperacao": 20, "maximoDeMoedas": 5, "alvo": 1.5, "perda": 1, "entrada": "ampla"},
-    {"id": "BG04", "nome": "Caçador 4h", "ligado": true, "periodo": "4h", "percentualPorOperacao": 25, "maximoDeMoedas": 4, "alvo": 1, "perda": 1, "entrada": "gatilho"},
-    {"id": "BG05", "nome": "Concentrado", "ligado": true, "periodo": "1d", "percentualPorOperacao": 50, "maximoDeMoedas": 2, "alvo": 1, "perda": 1, "entrada": "ampla"},
+    {"id": "BG04", "nome": "Caçador 4h", "ligado": true, "periodo": "4h", "validacao": "simples", "percentualPorOperacao": 25, "maximoDeMoedas": 4, "alvo": 1, "perda": 1, "entrada": "gatilho", "filtroMercado": false},
+    {"id": "BG05", "nome": "Concentrado", "ligado": true, "periodo": "1d", "validacao": "simples", "percentualPorOperacao": 50, "maximoDeMoedas": 2, "alvo": 1, "perda": 1, "entrada": "ampla", "filtroMercado": false},
     {"id": "BG06", "nome": "Diversificado", "ligado": true, "periodo": "1d", "percentualPorOperacao": 10, "maximoDeMoedas": 8, "alvo": 0.75, "perda": 0.75, "entrada": "ampla", "filtroMercado": false},
-    {"id": "BG07", "nome": "Agressivo", "ligado": true, "periodo": "4h", "percentualPorOperacao": 33, "maximoDeMoedas": 3, "alvo": 1.5, "perda": 1.5, "entrada": "ampla"},
+    {"id": "BG07", "nome": "Agressivo 1h", "ligado": true, "periodo": "1h", "validacao": "simples", "percentualPorOperacao": 33, "maximoDeMoedas": 3, "alvo": 1.5, "perda": 1.5, "entrada": "ampla", "filtroMercado": false},
     {"id": "BG08", "nome": "Corta-perda", "ligado": true, "periodo": "1d", "percentualPorOperacao": 20, "maximoDeMoedas": 5, "alvo": 0.5, "perda": 0.5, "entrada": "gatilho"},
     {"id": "BG09", "nome": "Altcoins cauteloso", "ligado": true, "universo": "altcoins", "periodo": "1d", "percentualPorOperacao": 10, "maximoDeMoedas": 5, "alvo": 1, "perda": 0.75, "entrada": "gatilho"},
-    {"id": "BG10", "nome": "Altcoins caçador", "ligado": true, "universo": "altcoins", "periodo": "1d", "percentualPorOperacao": 15, "maximoDeMoedas": 4, "alvo": 1.5, "perda": 1, "entrada": "ampla", "filtroMercado": false}
+    {"id": "BG10", "nome": "Altcoins caçador", "ligado": true, "universo": "altcoins", "periodo": "1d", "validacao": "simples", "percentualPorOperacao": 15, "maximoDeMoedas": 4, "alvo": 1.5, "perda": 1, "entrada": "ampla", "filtroMercado": false},
+    {"id": "BG11", "nome": "Explorador diário", "ligado": true, "periodo": "1d", "validacao": "nenhuma", "percentualPorOperacao": 15, "maximoDeMoedas": 5, "alvo": 1, "perda": 1, "entrada": "ampla", "filtroMercado": false},
+    {"id": "BG12", "nome": "Altcoins 4h", "ligado": true, "universo": "altcoins", "periodo": "4h", "validacao": "simples", "percentualPorOperacao": 15, "maximoDeMoedas": 4, "alvo": 1, "perda": 1, "entrada": "ampla", "filtroMercado": false}
   ]
 }

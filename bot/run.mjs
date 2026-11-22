@@ -16,6 +16,10 @@
 // Alvo e limite de perda são conferidos vela a vela de 1 hora desde a última checagem.
 // Universos: "principais" (as 15 moedas do app, padrão) ou "altcoins" (lista de candidatas no config, filtrada
 //   a cada checagem na Binance: precisa de par em USDT, volume mínimo em 24h e histórico mínimo; custo maior).
+// Exploração: por bot, "validacao" = "rigorosa" (padrão: só regras que passaram no teste completo), "simples" (lucro
+//   no teste cego com 2+ operações) ou "nenhuma" (segue o sinal da melhor regra mesmo sem validação), e "periodo"
+//   aceita "1h" (velas de 1 hora: muito mais sinais). Para não perder sinais quando o GitHub atrasa, a janela de
+//   "sinal novo" cobre as velas desde a última checagem.
 // Avisos: se existirem os segredos NTFY_TOPIC e/ou TELEGRAM_TOKEN + TELEGRAM_CHAT_ID, envia as decisões ao celular.
 import fs from 'fs';
 import path from 'path';
@@ -70,14 +74,19 @@ async function klines(interval, syms) {
   for (const sym of syms) { try { K[sym] = await kl(sym, interval); } catch (e) { console.warn('falhou', interval, sym, String(e.message || e)); } }
   return K;
 }
-const TFS = [...new Set(['1d', '4h', ...BOTS.map(b => presetOf(b).periodo === '4h' ? '4h' : '1d')])];
+const BARS = { '1d': 1, '4h': 6, '1h': 24 }; // velas por dia
+const tfOf = p => BARS[p.periodo] ? p.periodo : '1d';
+const TFS = [...new Set(['1d', '4h', ...BOTS.map(b => tfOf(presetOf(b)))])];
+// quantas velas se passaram desde a última checagem (o GitHub atrasa): sinais dentro dessa janela ainda contam como novos
+const G = Object.fromEntries(Object.keys(BARS).map(tf => { const min = tf === '1d' ? 2 : 3, cap = tf === '1d' ? 3 : tf === '4h' ? 6 : 12;
+  return [tf, Math.min(cap, Math.max(min, Math.ceil((now - (st.updated || now)) / (DAY / BARS[tf])) + 1))]; }));
 const DATA = {};
 for (const tf of TFS) DATA[tf] = await klines(tf, COINS.map(c => c.sym));
 
 // seleção das altcoins: par em USDT na Binance, volume mínimo e histórico mínimo
 const altInfo = { eligible: [], rejected: [] };
 if (altBots.length) {
-  const main = new Set(COINS.map(c => c.sym)), altTFs = [...new Set(altBots.map(b => presetOf(b).periodo === '4h' ? '4h' : '1d'))];
+  const main = new Set(COINS.map(c => c.sym)), altTFs = [...new Set(altBots.map(b => tfOf(presetOf(b))))];
   for (const sym of [...new Set(ALT.candidatas.map(x => String(x).toUpperCase().trim()))]) {
     if (main.has(sym)) { altInfo.rejected.push({ sym, why: 'já está entre as principais' }); continue; }
     let t24; try { t24 = await api(`/api/v3/ticker/24hr?symbol=${sym}USDT`); } catch (e) { altInfo.rejected.push({ sym, why: 'não encontrada na Binance (par em USDT)' }); continue; }
@@ -86,7 +95,7 @@ if (altBots.length) {
     let day; try { day = await kl(sym, '1d'); } catch (e) { altInfo.rejected.push({ sym, why: 'falha ao baixar o histórico' }); continue; }
     if (day.c.length < ALT.historicoMinimoDias) { altInfo.rejected.push({ sym, why: `só ${day.c.length} dias de histórico (mínimo ${ALT.historicoMinimoDias})`, vol }); continue; }
     DATA['1d'][sym] = day;
-    if (altTFs.includes('4h')) { try { DATA['4h'][sym] = await kl(sym, '4h'); } catch (e) {} }
+    for (const tf of altTFs) if (tf !== '1d') { try { DATA[tf][sym] = await kl(sym, tf); } catch (e) {} }
     ALTSET.add(sym); altInfo.eligible.push({ sym, vol, days: day.c.length });
   }
 }
@@ -107,7 +116,7 @@ for (const tf of TFS) {
   AN[tf] = {};
   for (const sym of Object.keys(DATA[tf])) {
     const d = DATA[tf][sym], day = DATA['1d'][sym]; if (!d || !day) continue;
-    const a = analyze(d, tf === '1d' ? 1 : 6, tf === '1d' ? 2 : 3, CF(sym)); if (!a) continue;
+    const a = analyze(d, BARS[tf], G[tf], CF(sym)); if (!a) continue;
     const vol = profile(day, null).vol, cl = a.full.trades.filter(t => !t.open), w = cl.filter(t => t.r > 0).map(t => t.r), l = cl.filter(t => t.r <= 0).map(t => -t.r);
     AN[tf][sym] = { a, d, gain: w.length >= 2 ? mean(w) : vol, loss: l.length >= 2 ? mean(l) : vol };
   }
@@ -126,6 +135,10 @@ for (const sym of [...new Set(Object.values(st.bots).flatMap(s => s.pos.map(x =>
 }
 
 const events = []; // para os avisos no celular
+// modos de validação e leitura do sinal da regra (independente da validação)
+const VAL = { rigorosa: a => a.valid, simples: a => a.best.score > 0 && a.best.oos.ret > 0 && a.best.oos.n >= 2, nenhuma: () => true };
+const VALTXT = { rigorosa: 'validado', simples: '(validação simples)', nenhuma: '(sem validação)' };
+const inPos = a => a.best.pos[a.best.pos.length - 1] === 1;
 const brl = usd => 'R$ ' + (usd * usdbrl).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const total = s => (s.value ?? s.cash) + (s.swept || 0);
 const result = s => total(s) / s.start - 1;
@@ -134,7 +147,8 @@ function newWallet() { const c0 = (cfg.capitalInicialBRL || 1000) / usdbrl; retu
 
 for (const b of BOTS) {
   const P = presetOf(b);
-  const tf = P.periodo === '4h' ? '4h' : '1d', tpM = +P.alvo || 1, slM = +P.perda || 1, frac = (+P.percentualPorOperacao || 20) / 100, max = +P.maximoDeMoedas || 5, onlyNew = P.entrada === 'gatilho';
+  const vmode = VAL[P.validacao] ? P.validacao : 'rigorosa', okV = VAL[vmode];
+  const tf = tfOf(P), tpM = +P.alvo || 1, slM = +P.perda || 1, frac = (+P.percentualPorOperacao || 20) / 100, max = +P.maximoDeMoedas || 5, onlyNew = P.entrada === 'gatilho';
   const useFilter = PROT.filtroMercado && b.filtroMercado !== false;
   const uni = b.universo === 'altcoins' ? 'altcoins' : 'principais';
   const UC = (uni === 'altcoins' ? altInfo.eligible.map(x => x.sym) : COINS.map(c => c.sym)).map(sym => ({ sym }));
@@ -164,7 +178,7 @@ for (const b of BOTS) {
     for (let i = s.pos.length - 1; i >= 0; i--) {
       const x = s.pos[i], p = price(x.sym), a = X[x.sym]?.a; if (!p) continue;
       const r = x.qty * p * (1 - CF(x.sym)) / x.cost - 1;
-      const why = r >= x.tp ? `Alvo de lucro atingido (${pct(x.tp)})` : r <= -x.sl ? `Limite de perda atingido (${pct(-x.sl)})` : (a && (a.sig === 'SELL' || a.sig === 'WAIT')) ? 'A regra da moeda deu saída' : null;
+      const why = r >= x.tp ? `Alvo de lucro atingido (${pct(x.tp)})` : r <= -x.sl ? `Limite de perda atingido (${pct(-x.sl)})` : (a && !inPos(a)) ? 'A regra da moeda deu saída' : null;
       if (why) sell(i, p, why); else x.chk = now;
     }
     // 3) TioPatinhas recolhe o lucro realizado quando chega ao gatilho
@@ -191,17 +205,18 @@ for (const b of BOTS) {
     else if (useFilter && !regime.ok) s.blocked = 'Filtro de mercado: Bitcoin abaixo da média de 200 dias';
     else {
       const cand = UC.map(c => {
-        const e = X[c.sym]; if (!e || !e.a.valid) return null; const { a, d } = e, p = price(c.sym);
+        const e = X[c.sym]; if (!e || !okV(e.a) || !inPos(e.a)) return null; const { a, d } = e, p = price(c.sym);
         const tp = clamp(e.gain * tpM, 0.003, 0.3), sl = clamp(e.loss * slM, 0.005, 0.3);
-        if (a.sig !== 'BUY' && !(!onlyNew && a.sig === 'HOLD' && p <= d.c[a.k] * (1 + tp / 2))) return null;
+        const fresh = a.since <= G[tf];
+        if (!fresh && !(!onlyNew && p <= d.c[a.k] * (1 + tp / 2))) return null;
         if (s.done[c.sym] === d.t[a.k] || s.pos.some(x => x.sym === c.sym)) return null;
-        return { c, a, d, p, tp, sl };
-      }).filter(Boolean).sort((x, y) => (y.a.sig === 'BUY') - (x.a.sig === 'BUY') || y.a.week - x.a.week);
+        return { c, a, d, p, tp, sl, fresh };
+      }).filter(Boolean).sort((x, y) => y.fresh - x.fresh || y.a.week - x.a.week);
       for (const k of cand) {
         if (s.pos.length >= max) break;
         const amt = Math.min(s.cash, value() * frac); if (amt < 5) break;
         s.cash -= amt; s.pos.push({ sym: k.c.sym, qty: amt * (1 - CF(k.c.sym)) / k.p, price: k.p, cost: amt, t: now, tp: k.tp, sl: k.sl }); s.done[k.c.sym] = k.d.t[k.a.k];
-        log(k.c.sym, 'COMPRA', (k.a.sig === 'BUY' ? 'Gatilho de compra validado' : 'Regra comprada e preço ainda perto da entrada') + ' · ' + k.a.best.s.name, k.p, null);
+        log(k.c.sym, 'COMPRA', (k.fresh ? `Gatilho de compra ${VALTXT[vmode]}` : `Regra comprada e preço ainda perto da entrada ${VALTXT[vmode]}`) + ' · ' + k.a.best.s.name, k.p, null);
       }
     }
   }
@@ -221,9 +236,9 @@ for (const b of BOTS) {
   ];
   s.ready = { ok: checks.every(c => c.ok), checks };
   s.name = String(P.nome || b.id).slice(0, 40); s.on = !!b.ligado; s.filter = useFilter;
-  s.cfg = { frac, max, tpM, slM, entry: onlyNew ? 'BUY' : 'ALL', tf, uni };
+  s.cfg = { frac, max, tpM, slM, entry: onlyNew ? 'BUY' : 'ALL', tf, uni, val: vmode, filter: useFilter };
   s.evolved = !!st.evo.overrides[b.id];
-  s.buyable = UC.filter(c => X[c.sym]?.a.valid && (X[c.sym].a.sig === 'BUY' || X[c.sym].a.sig === 'HOLD')).map(c => c.sym);
+  s.buyable = UC.filter(c => X[c.sym] && okV(X[c.sym].a) && inPos(X[c.sym].a)).map(c => c.sym);
 }
 for (const id of Object.keys(st.bots)) if (!BOTS.some(b => b.id === id)) st.bots[id].on = false; // bot retirado do config: fica guardado, desligado
 
@@ -233,10 +248,10 @@ if (EVO.ligado && now - st.evo.last >= EVO.intervaloDias * DAY) {
   const elig = BOTS.filter(b => b.ligado && st.bots[b.id].closed.length >= EVO.minimoOperacoes).map(b => ({ b, s: st.bots[b.id], r: result(st.bots[b.id]) })).sort((x, y) => y.r - x.r);
   if (elig.length >= 2 && (elig[0].r - elig[elig.length - 1].r) * 100 >= EVO.diferencaMinimaPercentual) {
     const best = elig[0], worst = elig[elig.length - 1], bp = presetOf(best.b);
-    const STEPS = { alvo: [0.5, 0.75, 1, 1.5], perda: [0.5, 0.75, 1, 1.5], percentualPorOperacao: [10, 20, 25, 33, 50], maximoDeMoedas: [1, 2, 3, 4, 5, 6, 8], periodo: ['1d', '4h'], entrada: ['gatilho', 'ampla'] };
+    const STEPS = { alvo: [0.5, 0.75, 1, 1.5], perda: [0.5, 0.75, 1, 1.5], percentualPorOperacao: [10, 20, 25, 33, 50], maximoDeMoedas: [1, 2, 3, 4, 5, 6, 8], periodo: ['1d', '4h', '1h'], entrada: ['gatilho', 'ampla'] };
     const keys = Object.keys(STEPS), key = keys[(st.evo.gen + Math.floor(now / DAY)) % keys.length], list = STEPS[key];
     const i = Math.max(0, list.indexOf(bp[key])), j = i + 1 < list.length ? i + 1 : i - 1;
-    const np = { periodo: bp.periodo, percentualPorOperacao: bp.percentualPorOperacao, maximoDeMoedas: bp.maximoDeMoedas, alvo: bp.alvo, perda: bp.perda, entrada: bp.entrada, [key]: list[j] };
+    const np = { validacao: bp.validacao || 'rigorosa', periodo: bp.periodo, percentualPorOperacao: bp.percentualPorOperacao, maximoDeMoedas: bp.maximoDeMoedas, alvo: bp.alvo, perda: bp.perda, entrada: bp.entrada, [key]: list[j] };
     const ws = worst.s;
     for (let k = ws.pos.length - 1; k >= 0; k--) { const x = ws.pos[k], p = price(x.sym) || x.price, got = x.qty * p * (1 - CF(x.sym)); ws.cash += got; ws.closed.push({ sym: x.sym, tin: x.t, tout: now, pin: x.price, pout: p, pnl: got - x.cost, cost: x.cost }); ws.pos.splice(k, 1); }
     ws.value = ws.cash;
@@ -251,7 +266,7 @@ if (EVO.ligado && now - st.evo.last >= EVO.intervaloDias * DAY) {
     fresh.log.push({ t: now, sym: '—', act: 'EVOLUI', why: txt, p: null, r: null });
     events.push({ t: now, bot: worst.b.id, name: worst.b.nome, sym: '—', act: 'EVOLUI', why: txt });
     Object.assign(fresh, { name: worst.b.nome, on: true, filter: worst.s.filter, evolved: true, buyable: [], ready: { ok: false, checks: [] },
-      cfg: { frac: np.percentualPorOperacao / 100, max: np.maximoDeMoedas, tpM: np.alvo, slM: np.perda, entry: np.entrada === 'gatilho' ? 'BUY' : 'ALL', tf: np.periodo } });
+      cfg: { frac: np.percentualPorOperacao / 100, max: np.maximoDeMoedas, tpM: np.alvo, slM: np.perda, entry: np.entrada === 'gatilho' ? 'BUY' : 'ALL', tf: np.periodo, uni: worst.s.cfg?.uni, val: np.validacao, filter: worst.s.filter } });
     fresh.bench.ret = 0;
   }
 }
@@ -294,5 +309,5 @@ if ((NTFY || TG) && spNow.getHours() >= NOTE.resumoDiarioHora && st.lastDaily !=
 
 fs.mkdirSync(path.dirname(path.resolve(statePath)), { recursive: true });
 fs.writeFileSync(statePath, JSON.stringify(st));
-console.log(`ok · ${TFS.join('+')} · mercado ${regime.ok ? 'liberado' : 'filtro ativo'} · validadas 1d=${st.validated['1d'].length} 4h=${(st.validated['4h'] || []).length} · ` +
+console.log(`ok · ${TFS.join('+')} · mercado ${regime.ok ? 'liberado' : 'filtro ativo'} · validadas 1d=${st.validated['1d'].length} 4h=${(st.validated['4h'] || []).length} 1h=${(st.validated['1h'] || []).length} · janela ${JSON.stringify(G)} · ` +
   BOTS.map(b => `${b.id} ${pct(result(st.bots[b.id]), 2)} ${st.bots[b.id].pos.length}p${st.bots[b.id].paused ? ' PAUSA' : ''}`).join(' · ') + ` · cofre ${st.tio.vault.toFixed(2)} USD · ${events.length} eventos`);

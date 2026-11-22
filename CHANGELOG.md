@@ -2,6 +2,14 @@
 
 Formato: MAIOR.MENOR.CORREÇÃO — MAIOR em reformulações grandes, MENOR quando entra função nova, CORREÇÃO em ajustes.
 
+## 1.8.0 — 2026-11-22
+- A equipe passa a ter dois grupos: 4 bots protegidos (BG01, BG03, BG08, BG09: validação rigorosa e filtro de mercado) e 8 de exploração, que operam mesmo em mercado de baixa
+- Novo ajuste por bot: validação “rigorosa”, “simples” (lucro no teste cego) ou “nenhuma” (segue o sinal da melhor regra)
+- Novo período de 1 hora, com muito mais sinais (BG02 Micro lucro 1h e BG07 Agressivo 1h)
+- Bots novos: BG11 Explorador diário e BG12 Altcoins 4h
+- Sinais que aparecem entre uma checagem e outra do GitHub não se perdem mais: a janela de “sinal novo” cobre o tempo desde a última checagem
+- Cartão de cada bot mostra se ele é “protegido” ou de “exploração”
+
 ## 1.7.0 — 2026-11-19
 - As altcoins aprovadas no teste (BG09 e BG10) passam a aparecer no Painel, na aba Moeda e na Base, num grupo separado
 - Layout novo: cabeçalho fixo, aba Bot dividida em Equipe, Decisões, Regras e Este aparelho, e cartões por bot no lugar da tabela larga

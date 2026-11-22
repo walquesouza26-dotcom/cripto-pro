@@ -13,12 +13,12 @@
 // Seleção automática: de tempos em tempos, o pior bot (com operações suficientes) recebe uma variação do preset
 //   do melhor e recomeça com R$ 1.000; o histórico anterior fica arquivado.
 // Custos: taxa de 0,1% + perda estimada entre compra e venda, por moeda (COST no motor).
-// Alvo e limite de perda são conferidos vela a vela de 1 hora desde a última checagem.
+// Alvo e limite de perda são conferidos vela a vela de 15 minutos desde a última checagem.
 // Universos: "principais" (as 15 moedas do app, padrão) ou "altcoins" (lista de candidatas no config, filtrada
 //   a cada checagem na Binance: precisa de par em USDT, volume mínimo em 24h e histórico mínimo; custo maior).
 // Exploração: por bot, "validacao" = "rigorosa" (padrão: só regras que passaram no teste completo), "simples" (lucro
 //   no teste cego com 2+ operações) ou "nenhuma" (segue o sinal da melhor regra mesmo sem validação), e "periodo"
-//   aceita "1h" (velas de 1 hora: muito mais sinais). Para não perder sinais quando o GitHub atrasa, a janela de
+//   aceita "1h" e "15m" (velas de 1 hora ou 15 minutos: muito mais sinais, para micro operações). Para não perder sinais quando o GitHub atrasa, a janela de
 //   "sinal novo" cobre as velas desde a última checagem.
 // Avisos: se existirem os segredos NTFY_TOPIC e/ou TELEGRAM_TOKEN + TELEGRAM_CHAT_ID, envia as decisões ao celular.
 import fs from 'fs';
@@ -74,11 +74,11 @@ async function klines(interval, syms) {
   for (const sym of syms) { try { K[sym] = await kl(sym, interval); } catch (e) { console.warn('falhou', interval, sym, String(e.message || e)); } }
   return K;
 }
-const BARS = { '1d': 1, '4h': 6, '1h': 24 }; // velas por dia
+const BARS = { '1d': 1, '4h': 6, '1h': 24, '15m': 96 }; // velas por dia
 const tfOf = p => BARS[p.periodo] ? p.periodo : '1d';
 const TFS = [...new Set(['1d', '4h', ...BOTS.map(b => tfOf(presetOf(b)))])];
 // quantas velas se passaram desde a última checagem (o GitHub atrasa): sinais dentro dessa janela ainda contam como novos
-const G = Object.fromEntries(Object.keys(BARS).map(tf => { const min = tf === '1d' ? 2 : 3, cap = tf === '1d' ? 3 : tf === '4h' ? 6 : 12;
+const G = Object.fromEntries(Object.keys(BARS).map(tf => { const min = tf === '1d' ? 2 : 3, cap = { '1d': 3, '4h': 6, '1h': 12, '15m': 24 }[tf];
   return [tf, Math.min(cap, Math.max(min, Math.ceil((now - (st.updated || now)) / (DAY / BARS[tf])) + 1))]; }));
 const DATA = {};
 for (const tf of TFS) DATA[tf] = await klines(tf, COINS.map(c => c.sym));
@@ -125,13 +125,13 @@ st.validated = Object.fromEntries(TFS.map(tf => [tf, COINS.filter(c => AN[tf][c.
 if (altBots.length) st.universes = { altcoins: { ...altInfo, validated: altInfo.eligible.filter(x => AN['1d'][x.sym]?.a.valid).map(x => x.sym), rules: { volumeMinimoUSD: ALT.volumeMinimoUSD, historicoMinimoDias: ALT.historicoMinimoDias, custoPorLado: ALT.custoPorLado }, t: now } };
 else delete st.universes;
 
-// velas de 1 hora das moedas com posição aberta, para conferir alvo e perda desde a última checagem
+// velas de 15 minutos das moedas com posição aberta, para conferir alvo e perda desde a última checagem
 const H = {};
 for (const sym of [...new Set(Object.values(st.bots).flatMap(s => s.pos.map(x => x.sym)))]) {
   try {
-    const raw = await api(`/api/v3/klines?symbol=${sym}USDT&interval=1h&limit=500`);
+    const raw = await api(`/api/v3/klines?symbol=${sym}USDT&interval=15m&limit=1000`);
     H[sym] = raw.filter(k => k[6] < now).map(k => ({ t: k[0], end: k[6], o: +k[1], h: +k[2], l: +k[3] }));
-  } catch (e) { console.warn('falhou 1h', sym, String(e.message || e)); }
+  } catch (e) { console.warn('falhou 15m', sym, String(e.message || e)); }
 }
 
 const events = []; // para os avisos no celular
@@ -248,7 +248,7 @@ if (EVO.ligado && now - st.evo.last >= EVO.intervaloDias * DAY) {
   const elig = BOTS.filter(b => b.ligado && st.bots[b.id].closed.length >= EVO.minimoOperacoes).map(b => ({ b, s: st.bots[b.id], r: result(st.bots[b.id]) })).sort((x, y) => y.r - x.r);
   if (elig.length >= 2 && (elig[0].r - elig[elig.length - 1].r) * 100 >= EVO.diferencaMinimaPercentual) {
     const best = elig[0], worst = elig[elig.length - 1], bp = presetOf(best.b);
-    const STEPS = { alvo: [0.5, 0.75, 1, 1.5], perda: [0.5, 0.75, 1, 1.5], percentualPorOperacao: [10, 20, 25, 33, 50], maximoDeMoedas: [1, 2, 3, 4, 5, 6, 8], periodo: ['1d', '4h', '1h'], entrada: ['gatilho', 'ampla'] };
+    const STEPS = { alvo: [0.5, 0.75, 1, 1.5], perda: [0.5, 0.75, 1, 1.5], percentualPorOperacao: [10, 20, 25, 33, 50], maximoDeMoedas: [1, 2, 3, 4, 5, 6, 8], periodo: ['1d', '4h', '1h', '15m'], entrada: ['gatilho', 'ampla'] };
     const keys = Object.keys(STEPS), key = keys[(st.evo.gen + Math.floor(now / DAY)) % keys.length], list = STEPS[key];
     const i = Math.max(0, list.indexOf(bp[key])), j = i + 1 < list.length ? i + 1 : i - 1;
     const np = { validacao: bp.validacao || 'rigorosa', periodo: bp.periodo, percentualPorOperacao: bp.percentualPorOperacao, maximoDeMoedas: bp.maximoDeMoedas, alvo: bp.alvo, perda: bp.perda, entrada: bp.entrada, [key]: list[j] };
@@ -309,5 +309,5 @@ if ((NTFY || TG) && spNow.getHours() >= NOTE.resumoDiarioHora && st.lastDaily !=
 
 fs.mkdirSync(path.dirname(path.resolve(statePath)), { recursive: true });
 fs.writeFileSync(statePath, JSON.stringify(st));
-console.log(`ok · ${TFS.join('+')} · mercado ${regime.ok ? 'liberado' : 'filtro ativo'} · validadas 1d=${st.validated['1d'].length} 4h=${(st.validated['4h'] || []).length} 1h=${(st.validated['1h'] || []).length} · janela ${JSON.stringify(G)} · ` +
+console.log(`ok · ${TFS.join('+')} · mercado ${regime.ok ? 'liberado' : 'filtro ativo'} · validadas 1d=${st.validated['1d'].length} 4h=${(st.validated['4h'] || []).length} 1h=${(st.validated['1h'] || []).length} 15m=${(st.validated['15m'] || []).length} · janela ${JSON.stringify(G)} · ` +
   BOTS.map(b => `${b.id} ${pct(result(st.bots[b.id]), 2)} ${st.bots[b.id].pos.length}p${st.bots[b.id].paused ? ' PAUSA' : ''}`).join(' · ') + ` · cofre ${st.tio.vault.toFixed(2)} USD · ${events.length} eventos`);

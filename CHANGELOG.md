@@ -2,6 +2,12 @@
 
 Formato: MAIOR.MENOR.CORREÇÃO — MAIOR em reformulações grandes, MENOR quando entra função nova, CORREÇÃO em ajustes.
 
+## 1.9.0 — 2026-11-22
+- Micro operações: os 8 bots de exploração passam a operar em períodos de 15 minutos e 1 hora, com alvo de lucro e limite de perda curtos (metade da média histórica)
+- Novo período de 15 minutos
+- Alvo e limite de perda passam a ser conferidos a cada vela de 15 minutos desde a última checagem (antes, de 1 hora)
+- Os 4 bots protegidos continuam como estavam, como comparação
+
 ## 1.8.0 — 2026-11-22
 - A equipe passa a ter dois grupos: 4 bots protegidos (BG01, BG03, BG08, BG09: validação rigorosa e filtro de mercado) e 8 de exploração, que operam mesmo em mercado de baixa
 - Novo ajuste por bot: validação “rigorosa”, “simples” (lucro no teste cego) ou “nenhuma” (segue o sinal da melhor regra)

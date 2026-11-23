@@ -271,6 +271,16 @@ if (EVO.ligado && now - st.evo.last >= EVO.intervaloDias * DAY) {
   }
 }
 
+// histórico para o Dash: resultado de cada bot (fração do capital, sem efeito do dólar), um ponto a cada 30 min, 60 dias
+if (!Array.isArray(st.hist) || !st.hist.length) {
+  // semente: reconstrói a evolução realizada a partir das operações já encerradas
+  const marks = [...new Set([st.since, ...Object.values(st.bots).flatMap(s => [s.since, ...s.closed.map(x => x.tout)])])].filter(t => t && t < now).sort((a, b) => a - b);
+  st.hist = marks.map(t => ({ t, btc: btcAt(t), seed: 1, v: Object.fromEntries(Object.entries(st.bots).filter(([, s]) => s.since <= t).map(([id, s]) => [id, +(s.closed.filter(x => x.tout <= t).reduce((v, x) => v + x.pnl, 0) / s.start).toFixed(5)])) }));
+}
+if (!st.hist.length || now - st.hist[st.hist.length - 1].t >= 30 * 60e3)
+  st.hist.push({ t: now, btc: BTC.last, fx: +usdbrl.toFixed(4), tio: +st.tio.vault.toFixed(4), v: Object.fromEntries(BOTS.map(b => [b.id, +result(st.bots[b.id]).toFixed(5)])) });
+st.hist = st.hist.filter(h => h.t >= now - 60 * DAY).slice(-3000);
+
 st.tio.on = !!TIO.ligado; st.tio.pct = TIO.gatilhoPercentual;
 st.protect = { filter: PROT.filtroMercado, brakePct: PROT.freioPerdaPercentual, pauseDays: PROT.pausaDoFreioDias };
 st.readyRule = READY; st.evoRule = EVO;

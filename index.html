@@ -145,6 +145,11 @@ details.panel[open]>summary{margin-bottom:10px}
 }
 .grptag{font-size:10px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:5px;text-transform:uppercase}
 .grptag.prot{background:#12314f;color:#8fc1ff}.grptag.exp{background:#40300a;color:#ffd166}
+.sparkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.sparkc{background:var(--s2);border:1px solid var(--line);border-radius:10px;padding:9px 10px}
+.sparkc .note{margin-top:4px}
+#t-dash .legend i{vertical-align:middle}
+@media(max-width:640px){.sparkgrid{grid-template-columns:1fr 1fr}.sparkc{padding:8px}.sparkc .mut{display:none}}
 </style>
 </head>
 <body>
@@ -160,11 +165,28 @@ details.panel[open]>summary{margin-bottom:10px}
 </header>
 <div id="prog"><i></i></div>
 <nav id="nav">
-  <button data-t="painel" data-i="📊" class="on">Painel</button><button data-t="moeda" data-i="🪙">Moeda</button>
+  <button data-t="dash" data-i="📈" class="on">Dash</button><button data-t="painel" data-i="📊">Painel</button><button data-t="moeda" data-i="🪙">Moeda</button>
   <button data-t="carteira" data-i="💼">Carteira</button><button data-t="bot" data-i="🤖">Bot</button><button data-t="base" data-i="🧠">Base</button><button data-t="logs" data-i="📜">Logs</button><button data-t="guia" data-i="📘">Guia</button>
 </nav>
 
-<section class="tab on" id="t-painel">
+<section class="tab on" id="t-dash">
+  <div class="kpis" id="dK"></div>
+  <div class="panel"><h2>Evolução por cenário</h2>
+    <div class="legend" id="dLeg"></div>
+    <div class="chart" id="dScen"></div>
+    <p class="note" id="dScenNote"></p></div>
+  <div class="panel"><h2>Cenários lado a lado</h2>
+    <div class="tw"><table><thead><tr><th>Cenário</th><th>Bots</th><th>Resultado médio</th><th>Operações</th><th>Acerto</th><th>Pior queda média</th></tr></thead><tbody id="dScenT"></tbody></table></div></div>
+  <div class="panel"><h2>Evolução de cada bot</h2>
+    <div class="sparkgrid" id="dBots"></div>
+    <p class="note">Resultado de cada bot desde que começou, em % dos R$ 1.000, sem o efeito do dólar. A linha fina marca o zero. Ordenado do melhor para o pior.</p></div>
+  <div class="g2">
+    <div class="panel"><h2>Resultado da equipe por dia</h2><div id="dDays"></div><p class="note">Lucro ou prejuízo das operações encerradas em cada dia, somando todos os bots (últimos 10 dias).</p></div>
+    <div class="panel"><h2>Carteira simulada deste aparelho</h2><div class="chart" id="dWallet"></div><p class="note" id="dWalletNote"></p></div>
+  </div>
+</section>
+
+<section class="tab" id="t-painel">
   <div class="kpis" id="kpis"></div>
   <div class="panel"><h2>Resumo ao vivo: o que está acontecendo agora</h2><div id="resumo" class="note" style="font-size:13px;color:var(--tx2)">Analisando…</div></div>
   <div class="panel"><h2>Oportunidades agora</h2><div class="opp" id="opp"><span class="note">Analisando histórico…</span></div></div>
@@ -342,7 +364,7 @@ details.panel[open]>summary{margin-bottom:10px}
 </div>
 
 <script>
-const APP_VERSION='1.9.0';document.getElementById('appVer').textContent=APP_VERSION;
+const APP_VERSION='1.10.0';document.getElementById('appVer').textContent=APP_VERSION;
 //<core>
 const COINS=[['BTC','Bitcoin'],['ETH','Ethereum'],['XRP','XRP'],['BNB','BNB'],['SOL','Solana'],['TRX','TRON'],['DOGE','Dogecoin'],['ADA','Cardano'],['LINK','Chainlink'],['LTC','Litecoin'],['AVAX','Avalanche'],['SUI','Sui'],['DOT','Polkadot'],['ZEC','Zcash'],['SHIB','Shiba Inu']].map(([sym,name])=>({sym,name,pair:sym+'USDT'}));
 const FEE=0.001, WARM=200, SPLIT=0.7;
@@ -427,12 +449,16 @@ const SIGL={BUY:'COMPRAR',HOLD:'MANTER',SELL:'VENDER',WAIT:'AGUARDAR',WEAK:'SINA
 const $=s=>document.querySelector(s);
 const db={get(k,def){try{const v=localStorage.getItem('cp_'+k);return v?JSON.parse(v):def;}catch(e){return def;}},set(k,v){try{localStorage.setItem('cp_'+k,JSON.stringify(v));}catch(e){}}};
 let tf=db.get('tf','1d'), cur=db.get('cur','BRL'), usdbrl=db.get('usdbrl',null);
-let K={}, A={}, P={}, live={}, sel=db.get('sel','BTC'), fng=null, tab='painel';
+let K={}, A={}, P={}, live={}, sel=db.get('sel','BTC'), fng=null, tab='dash';
 let logs=db.get('log',[]),logCat='Todos',logAsk=false;
 const LOGCATS=['Sistema','Sinais','Carteira','Bot','Área segura','Ordens reais','Central','Ajustes'];
 function logEv(cat,msg,quiet=0){const now=Date.now();if(quiet){for(let i=logs.length-1;i>=0&&now-logs[i].t<quiet;i--)if(logs[i].c===cat&&logs[i].m===msg)return;}
   logs.push({t:now,c:cat,m:String(msg).slice(0,300)});if(logs.length>2000)logs=logs.slice(-2000);db.set('log',logs);if(typeof tab!=='undefined'&&tab==='logs')renderLogs();}
 let pf=db.get('pf',{cash:null,start:null,pos:[],closed:[]});
+let pfHist=db.get('pfhist',null);
+function recPf(){if(pf.cash==null||!Object.keys(K).length)return;const now=Date.now();
+  if(!pfHist){let acc=0;const cl=[...pf.closed].sort((a,b)=>a.tout-b.tout);pfHist=[{t:Math.min(...cl.map(x=>x.tin),now-60e3),r:0}].concat(cl.map(x=>({t:x.tout,r:(acc+=x.pnl)/pf.start})));}
+  const last=pfHist[pfHist.length-1];if(!last||now-last.t>=10*60e3){pfHist.push({t:now,r:pfValue()/pf.start-1});if(pfHist.length>3000)pfHist=pfHist.slice(-3000);db.set('pfhist',pfHist);}}
 {const sa=db.get('alts',null);if(sa)setAlts(sa.list,sa.cost);}
 let bot=Object.assign({on:false,frac:0.2,max:5,tpM:1,slM:1,entry:'ALL',log:[],done:{},last:0},db.get('bot',{}));
 let dev=db.get('dev',null);if(!dev){const r=()=>Array.from(crypto.getRandomValues(new Uint8Array(4)),b=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b%32]).join('');dev={id:'AP-'+r()+'-'+r()};db.set('dev',dev);}
@@ -522,7 +548,7 @@ function lineChart(el,{labels,series,markers=[],guides=[],vline=null,fmt=v=>v,he
   for(let k=0;k<4;k++){const i=Math.round(k*(n-1)/3);g+=`<text x="${x(i)}" y="${H-5}" fill="#96958a" font-size="11" text-anchor="${k===0?'start':k===3?'end':'middle'}">${labels[i]}</text>`;}
   if(vline!=null&&vline>=0&&vline<n)g+=`<line x1="${x(vline)}" x2="${x(vline)}" y1="${m.t}" y2="${H-m.b}" stroke="#c3c2b7" stroke-width="1" stroke-dasharray="2 4"/>`;
   for(const s of series){let p='',pen=false;s.data.forEach((v,i)=>{if(v==null){pen=false;return;}p+=(pen?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1);pen=true;});
-    g+=`<path d="${p}" fill="none" stroke="${s.color}" stroke-width="${s.w||2}" stroke-linejoin="round"/>`;}
+    g+=`<path d="${p}" fill="none" stroke="${s.color}" stroke-width="${s.w||2}" stroke-linejoin="round"${s.dash?' stroke-dasharray="5 4"':''}/>`;}
   for(const k of markers){const X=x(k.i),Y=y(k.v);g+=k.buy?`<path d="M${X} ${Y+6}l6 10h-12z" fill="#3dbb5e" stroke="#1a1a19" stroke-width="1.5"/>`:`<path d="M${X} ${Y-6}l6 -10h-12z" fill="#e66767" stroke="#1a1a19" stroke-width="1.5"/>`;}
   g+=`<line id="cx" y1="${m.t}" y2="${H-m.b}" stroke="#c3c2b7" stroke-width="1" visibility="hidden"/>`;
   el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" height="${H}">${g}</svg><div class="tip"></div>`;
@@ -670,7 +696,7 @@ function botTick(){if(!bot.on||!Object.keys(A).length)return;let ch=false;bot.la
   if(ch){db.set('pf',pf);db.set('bot',bot);if(tab==='bot'||tab==='carteira'||tab==='moeda')render();}}
 const SRV='https://raw.githubusercontent.com/walquesouza26-dotcom/cripto-pro/bot-data/state.json';let srv=null,srvTs=0,srvErr='';
 async function loadSrv(){srvTs=Date.now();try{const r=await fetch(SRV+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error(r.status);srv=await r.json();srvErr='';
-    const U=srv.universes?.altcoins;if(U){const list=U.eligible.map(x=>x.sym),old=ALTS.map(a=>a.sym).join();setAlts(list,U.rules?.custoPorLado);db.set('alts',{list,cost:U.rules?.custoPorLado});if(list.join()!==old&&Object.keys(K).length){loadAll();try{ws&&ws.close();}catch(e){}}}}catch(e){srvErr=srv?'':'Ainda sem dados: o bot em segundo plano não rodou a primeira vez (ou o agendamento está desativado no GitHub).';}if(tab==='bot')renderSrv();if(tab==='painel')renderResumo();}
+    const U=srv.universes?.altcoins;if(U){const list=U.eligible.map(x=>x.sym),old=ALTS.map(a=>a.sym).join();setAlts(list,U.rules?.custoPorLado);db.set('alts',{list,cost:U.rules?.custoPorLado});if(list.join()!==old&&Object.keys(K).length){loadAll();try{ws&&ws.close();}catch(e){}}}}catch(e){srvErr=srv?'':'Ainda sem dados: o bot em segundo plano não rodou a primeira vez (ou o agendamento está desativado no GitHub).';}if(tab==='bot')renderSrv();if(tab==='painel')renderResumo();if(tab==='dash')renderDash();}
 const srvBots=()=>srv?.bots?Object.entries(srv.bots).map(([id,b])=>({id,...b})):[];
 const bState=b=>!b.on?'<span class="sig WAIT">DESLIGADO</span>':b.ready?.ok?'<span class="sig BUY">PRONTO</span>':b.paused?'<span class="sig SELL">PAUSADO</span>':b.blocked?'<span class="sig WEAK">FILTRO</span>':'<span class="sig HOLD">EM TESTE</span>';
 const bVal=b=>b.value??b.cash,bTot=b=>bVal(b)+(b.swept||0),bOps=b=>{const s=fxSplit(b.start,bTot(b),b.fx0);return s.brl?s.ops:bTot(b)-b.start;},bOpsTxt=b=>{const s=fxSplit(b.start,bTot(b),b.fx0);return s.brl?sgn(s.ops,brl):sgn(bTot(b)-b.start,fm2);};
@@ -746,6 +772,54 @@ function renderLogs(){
   $('#logRows').innerHTML=rows.length?rows.slice(-300).reverse().map(x=>`<tr><td>${dt(x.t,true)}</td><td><span class="val">${x.c}</span></td><td style="white-space:normal;text-align:left;min-width:190px">${String(x.m).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</td></tr>`).join(''):'<tr><td colspan="3" class="mut" style="text-align:center">Nada registrado com esse filtro.</td></tr>';
   $('#logInfo').textContent=`${rows.length} de ${logs.length} registro(s)`+(rows.length>300?' · mostrando os 300 mais recentes':'');}
 window.logSet=c=>{logCat=c;renderLogs();};
+// ---- Dash: evolução por cenário, por bot, carteira e resultado por dia ----
+const SCEN=[{k:'prot',name:'Protegidos',color:'#3987e5'},{k:'15m',name:'Micro 15 min',color:'#d95926'},{k:'1h',name:'Micro 1 hora',color:'#199e70'},{k:'outros',name:'Exploração diária e 4 h',color:'#9085e9'}];
+const scenOf=b=>{const c=b.cfg||{};if(c.filter!==false&&(c.val||'rigorosa')==='rigorosa')return'prot';return c.tf==='15m'?'15m':c.tf==='1h'?'1h':'outros';};
+let dashTs=0;
+function spark(vals,color){const pts=vals.map((v,i)=>[i,v]).filter(p=>p[1]!=null);if(pts.length<2)return'<div class="note" style="height:44px;display:flex;align-items:center">sem histórico ainda</div>';
+  const W=160,H=44,n=vals.length-1||1;let lo=Math.min(0,...pts.map(p=>p[1])),hi=Math.max(0,...pts.map(p=>p[1]));if(hi-lo<1e-6){hi+=0.5;lo-=0.5;}
+  const X=i=>i/n*W,Y=v=>H-2-(v-lo)/(hi-lo)*(H-4);
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%;height:${H}px;display:block"><line x1="0" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="#55554f" stroke-width="1"/><polyline fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke" points="${pts.map(p=>X(p[0]).toFixed(1)+','+Y(p[1]).toFixed(2)).join(' ')}"/></svg>`;}
+function renderDash(){dashTs=Date.now();recPf();
+  const bs=srvBots(),H=(srv?.hist||[]).filter(x=>x&&x.v);
+  if(!bs.length){$('#dK').innerHTML='<div class="kpi" style="grid-column:1/-1"><div class="k">Bots em segundo plano</div><div class="v" style="font-size:15px">Carregando dados…</div></div>';if(Date.now()-srvTs>15000)loadSrv();return;}
+  // KPIs
+  const opsBRL=bs.reduce((v,b)=>v+bOps(b),0),closed=bs.flatMap(b=>b.closed),wins=closed.filter(x=>x.pnl>0).length,btcRef=H.length?H[H.length-1].btc/H[0].btc-1:null;
+  const byScen=SCEN.map(s=>({...s,bots:bs.filter(b=>scenOf(b)===s.k)})).filter(s=>s.bots.length);
+  for(const s of byScen){s.res=mean(s.bots.map(b=>bTot(b)/b.start-1));s.n=s.bots.reduce((v,b)=>v+b.closed.length,0);s.w=s.bots.reduce((v,b)=>v+b.closed.filter(x=>x.pnl>0).length,0);s.dd=mean(s.bots.map(b=>b.maxDD||0));}
+  const best=[...byScen].sort((a,b)=>b.res-a.res)[0],v=pfValue(),ws=fxSplit(pf.start,v,pf.fx0);
+  $('#dK').innerHTML=[
+    ['Resultado da equipe',cur==='BRL'?sgn(opsBRL,brl):sgn(opsBRL,fm2),`${bs.length} bots · sem efeito do dólar`],
+    ['Operações encerradas',closed.length,closed.length?`${pcn(wins/closed.length)} com lucro`:'nenhuma ainda'],
+    ['Cofre do TioPatinhas',fm2(srv.tio?.vault||0),`${srv.tio?.sweeps?.length||0} recolhimento(s)`],
+    ['Melhor cenário',best&&Math.abs(best.res)>=5e-5?best.name:'Empate',best?`média ${pc(best.res,2)}`:''],
+    ['Segurar Bitcoin',btcRef==null?'—':`<span class="${cl(btcRef)}">${pc(btcRef,2)}</span>`,H.length?`desde ${dt(H[0].t)}`:''],
+    ['Carteira deste aparelho',fm2(v),ws.brl?`operações ${sgn(ws.ops,brl)}`:pc(v/pf.start-1,2)],
+  ].map(k=>`<div class="kpi"><div class="k">${k[0]}</div><div class="v" style="${String(k[1]).replace(/<[^>]+>/g,'').length>12?'font-size:15px':''}">${k[1]}</div><div class="s">${k[2]}</div></div>`).join('');
+  // evolução por cenário (média dos bots de cada cenário, em %) + referência
+  if(H.length>=2){const labels=H.map(x=>dt(x.t,true));
+    const series=byScen.map(s=>({name:s.name,color:s.color,data:H.map(x=>{const vs=s.bots.map(b=>x.v[b.id]).filter(z=>z!=null);return vs.length?mean(vs)*100:null;})}));
+    series.push({name:'Segurar Bitcoin',color:'#96958a',w:1.5,dash:true,data:H.map(x=>(x.btc/H[0].btc-1)*100)});
+    $('#dLeg').innerHTML=series.map(s=>`<span><i style="background:${s.color}${s.dash?';height:2px;border-top:1px dashed '+s.color:''}"></i>${s.name}</span>`).join('');
+    lineChart($('#dScen'),{labels,series,fmt:x=>pc(x/100,1),guides:[0],height:250});
+    $('#dScenNote').textContent=`Cada linha é a média do resultado dos bots daquele cenário (conforme o preset atual), em % do capital e sem o efeito do dólar. A linha tracejada mostra quanto teria rendido só segurar Bitcoin. Um ponto a cada 30 minutos; antes de ${dt(H.find(x=>!x.seed)?.t||Date.now())} a curva foi reconstruída só com as operações encerradas.`;}
+  else{$('#dLeg').innerHTML='';$('#dScen').innerHTML='<p class="note">O histórico começa a ser registrado agora: o gráfico aparece depois das próximas checagens.</p>';$('#dScenNote').textContent='';}
+  $('#dScenT').innerHTML=byScen.map(s=>`<tr><td><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${s.color};margin-right:6px"></i><b>${s.name}</b><div class="note" style="white-space:normal;margin-left:16px">${s.bots.map(b=>esc(b.id)).join(', ')}</div></td><td>${s.bots.length}</td><td class="${Math.abs(s.res)<5e-5?'':cl(s.res)}">${pc(s.res,2)}</td><td>${s.n}</td><td>${s.n?pcn(s.w/s.n):'—'}</td><td>${s.dd>0.00005?'−'+pcn(s.dd,1):'—'}</td></tr>`).join('');
+  // pequenos gráficos por bot
+  const colorOf=b=>(SCEN.find(s=>s.k===scenOf(b))||SCEN[0]).color;
+  $('#dBots').innerHTML=[...bs].sort((a,c)=>bTot(c)/c.start-bTot(a)/a.start).map(b=>{const r=bTot(b)/b.start-1,vals=H.map(x=>x.v[b.id]==null?null:x.v[b.id]*100);
+    return `<div class="sparkc"><div class="row" style="justify-content:space-between;gap:6px"><span><b>${esc(b.id)}</b> <span class="mut">${esc(b.name||'')}</span></span><b class="${Math.abs(r)<5e-5?'':cl(r)}">${pc(r,2)}</b></div>${spark(vals,colorOf(b))}<div class="note">${b.closed.length} encerrada(s) · ${b.pos.length} aberta(s) · ${esc((SCEN.find(s=>s.k===scenOf(b))||{}).name||'')}</div></div>`;}).join('');
+  // resultado por dia (todas as operações encerradas da equipe)
+  const day=t=>new Date(t).toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit'}),days=[];
+  for(let i=9;i>=0;i--)days.push(day(Date.now()-i*864e5));
+  const sum=Object.fromEntries(days.map(d=>[d,0]));for(const x of closed){const d=day(x.tout);if(d in sum)sum[d]+=x.pnl;}
+  hbars($('#dDays'),days.map(d=>({label:d,v:sum[d]})),fm2);
+  // carteira deste aparelho
+  const PH=(pfHist||[]).filter(x=>x.r!=null);
+  if(PH.length>=2){lineChart($('#dWallet'),{labels:PH.map(x=>dt(x.t,true)),series:[{name:'Resultado das operações',color:'#3987e5',data:PH.map(x=>x.r*100)}],fmt:x=>pc(x/100,2),guides:[0],height:200});}
+  else $('#dWallet').innerHTML='<p class="note">Ainda sem histórico: ele é registrado a cada 10 minutos com o app aberto.</p>';
+  $('#dWalletNote').innerHTML=`Resultado das compras e vendas simuladas deste aparelho, em %, sem o efeito do dólar. Valor atual: ${fm2(v)}${ws.brl?` (operações ${sgn(ws.ops,brl)} · dólar ${sgn(ws.fx,brl)})`:''}.`;
+}
 function renderBase(){
   const pr=db.get('perfis',null);$('#baseTs').textContent=pr?dt(pr.ts,true):'—';
   $('#baseBody').innerHTML=ALL().filter(c=>P[c.sym]).map((c,i,arr)=>(c.alt&&!(arr[i-1]?.alt)?'<tr><td colspan="10" class="grp">Altcoins menores (teste)</td></tr>':'')+(()=>{const p=P[c.sym],ad=p.afterDrop,ap=p.afterPump;
@@ -756,7 +830,7 @@ function renderBase(){
   const siglog=sigHistory();$('#logBody').innerHTML=siglog.length?siglog.slice(0,80).map(x=>{const p=price(x.sym),r=p?p/x.p-1:null;
     return `<tr><td>${dt(x.t,tf!=='1d')}</td><td><b>${x.sym}</b></td><td><span class="sig ${x.sig}">${SIGL[x.sig]}</span></td><td>${fm(x.p)}</td><td class="${cl(r)}">${pc(r,2)}</td><td>${x.rule}</td></tr>`;}).join(''):'<tr><td colspan="6" class="mut" style="text-align:center">Vazio</td></tr>';
 }
-function render(){({painel:renderPainel,moeda:renderMoeda,carteira:renderCarteira,bot:renderBot,base:renderBase,logs:renderLogs,guia(){}})[tab]();if(tab!=='painel')renderKpis();}
+function render(){({painel:renderPainel,moeda:renderMoeda,carteira:renderCarteira,dash:renderDash,bot:renderBot,base:renderBase,logs:renderLogs,guia(){}})[tab]();if(tab!=='painel')renderKpis();}
 function liveUpdate(){
   if(tab==='painel'){for(const c of ALL()){const l=live[c.sym];if(!l)continue;const t=fm(l.p);
       document.querySelectorAll(`[data-px="${c.sym}"]`).forEach(e=>{if(e.textContent!==t){e.textContent=t;e.classList.remove('flash');void e.offsetWidth;e.classList.add('flash');}});
@@ -764,6 +838,7 @@ function liveUpdate(){
   else if(tab==='moeda'){const e=$('#heroP');if(e)e.textContent=fm(price(sel));}
   else if(tab==='carteira')renderCarteira();
   else if(tab==='bot')renderBot();
+  else if(tab==='dash'&&Date.now()-dashTs>60000)renderDash();
 }
 function show(t){tab=t;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));document.querySelectorAll('.tab').forEach(s=>s.classList.toggle('on',s.id==='t-'+t));render();window.scrollTo(0,0);}
 window.pick=s=>{sel=s;db.set('sel',s);show('moeda');};
@@ -774,7 +849,7 @@ $('#tf').value=tf;$('#cur').value=cur;
 $('#tf').onchange=e=>{tf=e.target.value;logEv('Ajustes','Período de análise alterado para '+(tf==='1d'?'diário':'4 horas'));db.set('tf',tf);$('#prog').style.visibility='visible';$('#prog i').style.width='0';loadAll();};
 $('#cur').onchange=e=>{cur=e.target.value;logEv('Ajustes','Moeda de exibição alterada para '+cur);db.set('cur',cur);render();};
 $('#reload').onclick=()=>{$('#prog').style.visibility='visible';$('#prog i').style.width='0';loadAll();};
-$('#pfReset').onclick=()=>{logEv('Carteira','Carteira simulada reiniciada');bot.done={};db.set('bot',bot);let s=+$('#pfStart').value||1000;if(cur==='BRL')s/=(usdbrl||5);pf={cash:s,start:s,fx0:usdbrl,pos:[],closed:[]};db.set('pf',pf);renderCarteira();};
+$('#pfReset').onclick=()=>{pfHist=null;db.set('pfhist',null);logEv('Carteira','Carteira simulada reiniciada');bot.done={};db.set('bot',bot);let s=+$('#pfStart').value||1000;if(cur==='BRL')s/=(usdbrl||5);pf={cash:s,start:s,fx0:usdbrl,pos:[],closed:[]};db.set('pf',pf);renderCarteira();};
 // ---- ÁREA SEGURA: cofre com senha + conta Binance (WebSocket API assinada) ----
 let vault=db.get('vault',null),V=null,vKey=null,vAct=0,vMsg='',vWipe=false,vBusy=false,vFail=db.get('vfail',{n:0,until:0});
 let bk=db.get('bk',null),acct=null,acctTs=0,acctMsg='',acctBusy=false,allPx=null,ord=null,ordMsg='',realLog=db.get('reallog',[]),tOff=null,keyAsk=false;
@@ -966,7 +1041,7 @@ $('#logClr').onclick=()=>{if(!logAsk){logAsk=true;$('#logClr').textContent='Conf
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
 let deferred;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferred=e;$('#inst').style.display='inline-block';});
 $('#inst').onclick=async()=>{if(!deferred)return;deferred.prompt();await deferred.userChoice;deferred=null;$('#inst').style.display='none';};
-let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(tab==='moeda')renderMoeda();},250);});
+let rz;window.addEventListener('resize',()=>{clearTimeout(rz);rz=setTimeout(()=>{if(tab==='moeda')renderMoeda();if(tab==='dash')renderDash();},250);});
 logEv('Sistema',`App aberto · versão ${APP_VERSION} · aparelho ${dev.id}`);Promise.race([loadSrv(),new Promise(r=>setTimeout(r,2500))]).finally(()=>{loadAll();connectWS();});loadFng();
 setInterval(loadAll,15*60*1000);
 </script>

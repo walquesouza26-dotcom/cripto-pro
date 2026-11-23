@@ -10,6 +10,7 @@ Outras regras:
 - O motor de análise fica entre `//<core>` e `//</core>` em `index.html`; `bot/run.mjs` lê esse trecho, então mantenha-o sem dependência de DOM.
 - `bot/config.json` lista os bots em segundo plano (ids `BG01`…`BG12`; `universo: "altcoins"` usa a lista `universos.altcoins.candidatas`, filtrada na Binance a cada checagem, com custo `custoPorLado`); cada um tem carteira simulada própria no ramo `bot-data` (`state.json`, formato v2). Retirar um bot do config só o desliga; o histórico fica guardado.
 - Por bot: `validacao` (`rigorosa` padrão, `simples`, `nenhuma`) e `periodo` (`1d`, `4h`, `1h`, `15m`). Grupo “protegido” = rigorosa + filtro; os demais são “exploração”.
+- `state.hist`: um ponto a cada 30 min (60 dias) com `v[id]` = resultado de cada bot (fração, sem dólar) e `btc`; alimenta a aba Dash (tela principal). Cenários no Dash: protegidos, micro 15 min, micro 1 hora, outros.
 - TioPatinhas (`tioPatinhas` no config, estado em `state.tio`): recolhe o lucro realizado de cada bot ao atingir `gatilhoPercentual`% do capital; `swept` de cada bot guarda o total recolhido. Resultado de um bot = valor + swept − start.
 - Proteções e critérios ficam em `bot/config.json` (`protecoes`, `prontoParaReal`, `selecaoAutomatica`, `avisos`). A seleção automática grava presets ajustados em `state.evo.overrides` (o config continua sendo a base).
 - Custos por moeda: `COST(sym)` no motor (taxa + perda entre compra e venda). Toda conta de dinheiro simulado usa `COST`, não `FEE`.

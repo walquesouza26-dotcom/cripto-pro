@@ -2,6 +2,11 @@
 
 Formato: MAIOR.MENOR.CORREÇÃO — MAIOR em reformulações grandes, MENOR quando entra função nova, CORREÇÃO em ajustes.
 
+## 1.10.0 — 2026-11-23
+- Nova aba Dash, agora a tela principal: resultado da equipe, operações, cofre, melhor cenário, referência de segurar Bitcoin e carteira do aparelho
+- Gráfico da evolução de cada cenário (Protegidos, Micro 15 min, Micro 1 hora) contra segurar Bitcoin, tabela dos cenários lado a lado, mini-gráfico de cada bot, resultado da equipe por dia e evolução da carteira simulada do aparelho
+- Os bots passam a guardar um ponto de histórico a cada 30 minutos (até 60 dias); o período anterior foi reconstruído a partir das operações já encerradas
+
 ## 1.9.0 — 2026-11-22
 - Micro operações: os 8 bots de exploração passam a operar em períodos de 15 minutos e 1 hora, com alvo de lucro e limite de perda curtos (metade da média histórica)
 - Novo período de 15 minutos

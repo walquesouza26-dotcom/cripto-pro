@@ -2,6 +2,12 @@
 
 Formato: MAIOR.MENOR.CORREÇÃO — MAIOR em reformulações grandes, MENOR quando entra função nova, CORREÇÃO em ajustes.
 
+## 1.11.0 — 2026-11-23
+- TioPatinhas passa a recolher a partir de 0,1% do capital do bot (R$ 1 em R$ 1.000), em vez de 1% (R$ 10), para captar os ganhos das micro operações
+- Avisos no celular mostram o valor em reais de cada venda, o total das vendas daquela checagem e o resultado das vendas do dia
+- Limite de perda e alvo de lucro passam a considerar também a vela de 15 minutos em andamento, para a venda acontecer no preço do limite e não no preço da checagem
+- Diário dos bots em segundo plano mostra o valor em reais de cada venda
+
 ## 1.10.0 — 2026-11-23
 - Nova aba Dash, agora a tela principal: resultado da equipe, operações, cofre, melhor cenário, referência de segurar Bitcoin e carteira do aparelho
 - Gráfico da evolução de cada cenário (Protegidos, Micro 15 min, Micro 1 hora) contra segurar Bitcoin, tabela dos cenários lado a lado, mini-gráfico de cada bot, resultado da equipe por dia e evolução da carteira simulada do aparelho

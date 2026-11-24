@@ -130,7 +130,7 @@ const H = {};
 for (const sym of [...new Set(Object.values(st.bots).flatMap(s => s.pos.map(x => x.sym)))]) {
   try {
     const raw = await api(`/api/v3/klines?symbol=${sym}USDT&interval=15m&limit=1000`);
-    H[sym] = raw.filter(k => k[6] < now).map(k => ({ t: k[0], end: k[6], o: +k[1], h: +k[2], l: +k[3] }));
+    H[sym] = raw.filter(k => k[0] < now).map(k => ({ t: k[0], end: Math.min(k[6], now), o: +k[1], h: +k[2], l: +k[3] })); // inclui a vela em andamento
   } catch (e) { console.warn('falhou 15m', sym, String(e.message || e)); }
 }
 
@@ -158,8 +158,8 @@ for (const b of BOTS) {
   if (!s.bench) s.bench = { btc0: btcAt(s.since) };
   if (s.peak == null) { s.peak = s.start; s.maxDD = 0; }
   if (s.brakeBase == null) s.brakeBase = s.start;
-  const log = (sym, act, why, p, r, t = now) => { s.log.push({ t, sym, act, why, p, r }); if (s.log.length > 200) s.log = s.log.slice(-200); events.push({ t, bot: b.id, name: P.nome || b.id, sym, act, why, p, r }); };
-  const sell = (i, p, why, t = now) => { const x = s.pos[i], got = x.qty * p * (1 - CF(x.sym)); s.cash += got; s.closed.push({ sym: x.sym, tin: x.t, tout: t, pin: x.price, pout: p, pnl: got - x.cost, cost: x.cost }); s.pos.splice(i, 1); log(x.sym, 'VENDA', why, p, got / x.cost - 1, t); };
+  const log = (sym, act, why, p, r, t = now, pnl = null) => { s.log.push({ t, sym, act, why, p, r, pnl }); if (s.log.length > 200) s.log = s.log.slice(-200); events.push({ t, bot: b.id, name: P.nome || b.id, sym, act, why, p, r, pnl }); };
+  const sell = (i, p, why, t = now) => { const x = s.pos[i], got = x.qty * p * (1 - CF(x.sym)); s.cash += got; s.closed.push({ sym: x.sym, tin: x.t, tout: t, pin: x.price, pout: p, pnl: got - x.cost, cost: x.cost }); s.pos.splice(i, 1); log(x.sym, 'VENDA', why, p, got / x.cost - 1, t, got - x.cost); };
   const value = () => s.cash + s.pos.reduce((v, x) => v + x.qty * (price(x.sym) || x.price), 0);
   const X = AN[tf];
   s.blocked = null;
@@ -299,12 +299,18 @@ async function send(title, text) {
 const ICON = { COMPRA: '🟢', VENDA: '🔴', RECOLHE: '💰', PAUSA: '⛔', RETOMA: '▶️', EVOLUI: '🧬' };
 if (events.length && (NTFY || TG)) {
   const lines = events.sort((x, y) => x.t - y.t).map(e => {
-    if (e.act === 'COMPRA') return `${ICON.COMPRA} ${e.bot} comprou ${e.sym} a US$ ${e.p}`;
-    if (e.act === 'VENDA') return `${ICON.VENDA} ${e.bot} vendeu ${e.sym} (${pct(e.r, 2)}) · ${e.why}`;
+    if (e.act === 'COMPRA') return `🔵 ${e.bot} comprou ${e.sym} a US$ ${e.p}`;
+    if (e.act === 'VENDA') return `${e.pnl > 0 ? '🟢' : ICON.VENDA} ${e.bot} vendeu ${e.sym}: ${e.pnl >= 0 ? '+' : '−'}${brl(Math.abs(e.pnl))} (${pct(e.r, 2)}) · ${e.why}`;
     if (e.act === 'RECOLHE') return `${ICON.RECOLHE} TioPatinhas recolheu ${brl(e.p)} do ${e.bot}`;
     return `${ICON[e.act] || '•'} ${e.bot}: ${e.why}`;
   });
-  await send(`Cripto Pro: ${events.length} decisão(ões) dos bots`, lines.join('\n') + `\n\nCofre do TioPatinhas: ${brl(st.tio.vault)}. Tudo simulado.`);
+  const sp = t => new Date(t).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }), hoje = sp(now);
+  const dayPnl = Object.values(st.bots).flatMap(s => s.closed).filter(x => sp(x.tout) === hoje).reduce((v, x) => v + x.pnl, 0);
+  const runPnl = events.filter(e => e.act === 'VENDA').reduce((v, e) => v + (e.pnl || 0), 0);
+  const sg = v => (v >= 0 ? '+' : '−') + brl(Math.abs(v));
+  await send(`Cripto Pro: ${events.length} decisão(ões) dos bots`, lines.join('\n') +
+    (events.some(e => e.act === 'VENDA') ? `\n\nNestas vendas: ${sg(runPnl)}.` : '') +
+    `\nResultado das vendas de hoje (equipe): ${sg(dayPnl)}.\nCofre do TioPatinhas: ${brl(st.tio.vault)}. Tudo simulado.`);
 }
 const spNow = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
 const today = spNow.toISOString().slice(0, 10);

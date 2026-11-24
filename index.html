@@ -364,7 +364,7 @@ details.panel[open]>summary{margin-bottom:10px}
 </div>
 
 <script>
-const APP_VERSION='1.10.0';document.getElementById('appVer').textContent=APP_VERSION;
+const APP_VERSION='1.11.0';document.getElementById('appVer').textContent=APP_VERSION;
 //<core>
 const COINS=[['BTC','Bitcoin'],['ETH','Ethereum'],['XRP','XRP'],['BNB','BNB'],['SOL','Solana'],['TRX','TRON'],['DOGE','Dogecoin'],['ADA','Cardano'],['LINK','Chainlink'],['LTC','Litecoin'],['AVAX','Avalanche'],['SUI','Sui'],['DOT','Polkadot'],['ZEC','Zcash'],['SHIB','Shiba Inu']].map(([sym,name])=>({sym,name,pair:sym+'USDT'}));
 const FEE=0.001, WARM=200, SPLIT=0.7;
@@ -703,7 +703,7 @@ const bVal=b=>b.value??b.cash,bTot=b=>bVal(b)+(b.swept||0),bOps=b=>{const s=fxSp
 function tioTxt(short){const t=srv?.tio;if(!t)return'';const bs=srvBots(),n=t.sweeps.length,last=t.sweeps[n-1],ini=bs.reduce((v,b)=>v+b.start,0),neg=bs.reduce((v,b)=>v+bVal(b),0),ops=bs.reduce((v,b)=>v+bOps(b),0);
   const head=`<b>TioPatinhas</b> ${t.on?'':'(desligado) '}— cofre <b>${fm2(t.vault)}</b> em ${n} recolhimento(s)`+(last?`; último: ${esc(last.bot)} ${fm2(last.amt)} ${ago(last.t)}`:'; ainda nenhum');
   if(short)return head+'.';
-  return `<div class="card"><div>${head}.</div><div class="s">Regra: recolhe o lucro realizado de cada bot quando ele passa de ${t.pct??1}% do capital do bot (R$ 10 em R$ 1.000). Perdas ficam com o bot, que precisa recuperá-las antes do próximo recolhimento.</div>
+  return `<div class="card"><div>${head}.</div><div class="s">Regra: recolhe o lucro realizado de cada bot quando ele passa de ${t.pct??1}% do capital do bot (R$ ${((t.pct??1)*10).toLocaleString('pt-BR',{maximumFractionDigits:2})} em R$ 1.000). Perdas ficam com o bot, que precisa recuperá-las antes do próximo recolhimento.</div>
     <div class="s" style="margin-top:6px">Equipe: ${bs.length} bots · capital inicial ${cur==='BRL'&&bs.every(b=>b.fx0)?brl(bs.reduce((v,b)=>v+b.start*b.fx0,0)):fm2(ini)} · saldo dos bots ${fm2(neg)} · no cofre ${fm2(t.vault)} · resultado das operações ${cur==='BRL'?sgn(ops,brl):sgn(ops,fm2)}</div></div>`;}
 function renderSrv(){
   const bs=srvBots();
@@ -738,7 +738,7 @@ function renderSrv(){
   const pos=bs.flatMap(b=>b.pos.map(x=>({b,x})));
   $('#srvPos').innerHTML=pos.length?pos.map(({b,x})=>{const p=px(x.sym)||x.price,r=x.qty*p*(1-COST(x.sym))/x.cost-1;return `<tr class="click" onclick="pick('${x.sym}')"><td><b>${esc(b.id)}</b></td><td><b>${x.sym}</b> <span class="mut">${dt(x.t)}</span></td><td>${fm(x.price)}</td><td>${fm(p)}</td><td class="${cl_(r)}">${pc(r,2)}</td><td><span class="up">${pc(x.tp)}</span> / <span class="dn">−${pcn(x.sl,1)}</span></td></tr>`;}).join(''):'<tr><td colspan="6" class="mut" style="text-align:center">Nenhuma posição aberta: sem gatilho de compra validado, os bots ficam em caixa.</td></tr>';
   const lg=bs.flatMap(b=>b.log.map(x=>({b,x}))).sort((a,c)=>c.x.t-a.x.t).slice(0,60);
-  $('#srvLog').innerHTML=lg.length?lg.map(({b,x})=>`<tr><td>${dt(x.t,true)}</td><td><b>${esc(b.id)}</b></td><td><b>${x.sym}</b></td><td><span class="sig ${x.act==='COMPRA'?'BUY':x.act==='RECOLHE'?'HOLD':x.act==='VENDA'?'SELL':'WEAK'}">${x.act}</span></td><td>${x.p==null?'—':x.act==='RECOLHE'?fm2(x.p):fm(x.p)}</td><td class="${cl_(x.r)}">${x.r==null?'—':pc(x.r,2)}</td><td style="white-space:normal;min-width:180px;text-align:left">${x.why}</td></tr>`).join(''):'<tr><td colspan="7" class="mut" style="text-align:center">Ainda sem decisões.</td></tr>';
+  $('#srvLog').innerHTML=lg.length?lg.map(({b,x})=>`<tr><td>${dt(x.t,true)}</td><td><b>${esc(b.id)}</b></td><td><b>${x.sym}</b></td><td><span class="sig ${x.act==='COMPRA'?'BUY':x.act==='RECOLHE'?'HOLD':x.act==='VENDA'?'SELL':'WEAK'}">${x.act}</span></td><td>${x.p==null?'—':x.act==='RECOLHE'?fm2(x.p):fm(x.p)}</td><td class="${cl_(x.r)}">${x.r==null?'—':pc(x.r,2)}${x.pnl!=null?`<br><small>${x.pnl>=0?'+':'−'}${fm2(Math.abs(x.pnl))}</small>`:''}</td><td style="white-space:normal;min-width:180px;text-align:left">${x.why}</td></tr>`).join(''):'<tr><td colspan="7" class="mut" style="text-align:center">Ainda sem decisões.</td></tr>';
 }
 function renderBot(){renderSrv();if(Date.now()-srvTs>120000)loadSrv();
   $('#botState').textContent=bot.on?'LIGADO':'DESLIGADO';$('#botState').className='sig '+(bot.on?'BUY':'WAIT');$('#botBtn').textContent=bot.on?'Desligar bot':'Ligar bot';$('#botBtn').className=bot.on?'dan':'pri';

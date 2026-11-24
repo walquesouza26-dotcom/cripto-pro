@@ -1,6 +1,6 @@
 {
   "capitalInicialBRL": 1000,
-  "tioPatinhas": {"ligado": true, "gatilhoPercentual": 1},
+  "tioPatinhas": {"ligado": true, "gatilhoPercentual": 0.1},
   "protecoes": {"filtroMercado": true, "freioPerdaPercentual": 5, "pausaDoFreioDias": 7},
   "prontoParaReal": {"minimoOperacoes": 30, "quedaMaximaPercentual": 5},
   "selecaoAutomatica": {"ligado": true, "minimoOperacoes": 20, "intervaloDias": 7, "diferencaMinimaPercentual": 2},
